@@ -62,6 +62,7 @@ enum {
     TMXLayerAttribBase64 = 1 << 1,
     TMXLayerAttribGzip = 1 << 2,
     TMXLayerAttribZlib = 1 << 3,
+    TMXLayerAttribCSV = 1 << 4,
 };
 
 enum {
@@ -117,6 +118,48 @@ public:
     Vec2               _offset;
 };
 
+class CC_DLL TMXObjectGroupInfo : public Ref
+{
+public:
+    /**
+     * @js ctor
+     */
+    TMXObjectGroupInfo();
+    /**
+     * @js NA
+     * @lua NA
+     */
+    virtual ~TMXObjectGroupInfo();
+
+    /** Gets the list of properties stored in a dictionary.
+     *
+     * @return The list of properties stored in a dictionary.
+     */
+    inline ValueMap& getProperties() { return _properties; };
+    
+    /** Sets the list of properties.
+     *
+     * @param properties The list of properties.
+     */
+    inline void setProperties(const ValueMap& properties) {
+        _properties = properties;
+    };
+    
+public:
+    /** name of the group */
+    std::string _groupName;
+    /** offset position of child objects */
+    Vec2 _positionOffset;
+    /** list of properties stored in a dictionary */
+    ValueMap _properties;
+    /** array of the objects */
+    ValueVector _objects;
+
+    bool            _visible;
+    Color3B         _color;
+    unsigned char   _opacity;
+};
+
 /** @brief TMXTilesetInfo contains the information about the tilesets like:
 - Tileset name
 - Tileset spacing
@@ -135,10 +178,12 @@ public:
     Size            _tileSize;
     int             _spacing;
     int             _margin;
+    Vec2            _tileOffset;
     //! filename containing the tiles (should be spritesheet / texture atlas)
     std::string     _sourceImage;
     //! size in pixels of the image
     Size            _imageSize;
+    std::string     _originSourceImage;
 public:
     /**
      * @js ctor
@@ -200,7 +245,18 @@ public:
     /// map orientation
     inline int getOrientation() const { return _orientation; };
     inline void setOrientation(int orientation) { _orientation = orientation; };
+    
+    /// map staggeraxis
+    inline int getStaggerAxis() const { return _staggerAxis; };
+    inline void setStaggerAxis(int staggerAxis) { _staggerAxis = staggerAxis; };
 
+    /// map stagger index
+    inline int getStaggerIndex() const { return _staggerIndex; };
+    inline void setStaggerIndex(int staggerIndex) { _staggerIndex = staggerIndex; };
+
+    /// map hexsidelength
+    inline int getHexSideLength() const { return _hexSideLength; };
+    inline void setHexSideLength(int hexSideLength) { _hexSideLength = hexSideLength; };
     /// map width & height
     inline const Size& getMapSize() const { return _mapSize; };
     inline void setMapSize(const Size& mapSize) { _mapSize = mapSize; };
@@ -224,10 +280,17 @@ public:
     };
 
     /// ObjectGroups
-    inline const Vector<TMXObjectGroup*>& getObjectGroups() const { return _objectGroups; };
-    inline Vector<TMXObjectGroup*>& getObjectGroups() { return _objectGroups; };
-    inline void setObjectGroups(const Vector<TMXObjectGroup*>& groups) {
+    inline const Vector<TMXObjectGroupInfo*>& getObjectGroups() const { return _objectGroups; };
+    inline Vector<TMXObjectGroupInfo*>& getObjectGroups() { return _objectGroups; };
+    inline void setObjectGroups(const Vector<TMXObjectGroupInfo*>& groups) {
         _objectGroups = groups;
+    };
+    
+    /// all children
+    inline const Vector<Ref*>& getAllChildren() const { return _allChildren; };
+    inline Vector<Ref*>& getAllChildren() { return _allChildren; };
+    inline void setAllChildren(const Vector<Ref*>& children) {
+        _allChildren = children;
     };
 
     /// parent element
@@ -275,12 +338,19 @@ public:
     inline void setCurrentString(const std::string& currentString){ _currentString = currentString; }
     inline const std::string& getTMXFileName() const { return _TMXFileName; }
     inline void setTMXFileName(const std::string& fileName){ _TMXFileName = fileName; }
+    inline const std::string& getExternalTilesetFileName() const { return _externalTilesetFilename; }
 
 protected:
     void internalInit(const std::string& tmxFileName, const std::string& resourcePath);
 
     /// map orientation
     int    _orientation;
+    ///map staggerAxis
+    int    _staggerAxis;
+    ///map staggerIndex
+    int    _staggerIndex;
+    ///map hexsidelength
+    int    _hexSideLength;
     /// map width & height
     Size _mapSize;
     /// tiles width & height
@@ -290,7 +360,9 @@ protected:
     /// tilesets
     Vector<TMXTilesetInfo*> _tilesets;
     /// ObjectGroups
-    Vector<TMXObjectGroup*> _objectGroups;
+    Vector<TMXObjectGroupInfo*> _objectGroups;
+    /// all children
+    Vector<Ref*> _allChildren;
     /// parent element
     int _parentElement;
     /// parent GID
@@ -314,6 +386,7 @@ protected:
     ValueMapIntKey _tileProperties;
     int _currentFirstGID;
     bool _recordFirstGID;
+    std::string _externalTilesetFilename;
 };
 
 // end of tilemap_parallax_nodes group

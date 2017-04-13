@@ -21,15 +21,17 @@
  * THE SOFTWARE.
  */
 
-#include "jsb_websocket.h"
-#include "cocos2d.h"
+#include "scripting/js-bindings/manual/network/jsb_websocket.h"
+
+#include "base/ccUTF8.h"
+#include "base/CCDirector.h"
 #include "network/WebSocket.h"
-#include "spidermonkey_specifics.h"
-#include "ScriptingCore.h"
-#include "cocos2d_specifics.hpp"
+#include "platform/CCPlatformMacros.h"
+#include "scripting/js-bindings/manual/ScriptingCore.h"
+#include "scripting/js-bindings/manual/cocos2d_specifics.hpp"
+#include "scripting/js-bindings/manual/spidermonkey_specifics.h"
 
 using namespace cocos2d::network;
-using namespace cocos2d;
 
 /*
  [Constructor(in DOMString url, in optional DOMString protocols)]
@@ -60,9 +62,10 @@ using namespace cocos2d;
 class JSB_WebSocketDelegate : public WebSocket::Delegate
 {
 public:
-    JSB_WebSocketDelegate(JSContext *cx_)
-    : cx(cx_)
+
+    JSB_WebSocketDelegate()
     {
+        JSContext* cx = ScriptingCore::getInstance()->getGlobalContext();
         _JSDelegate.construct(cx);
     }
 
@@ -76,11 +79,12 @@ public:
         js_proxy_t * p = jsb_get_native_proxy(ws);
         if (!p) return;
 
-        if (Director::DirectorInstance == nullptr || ScriptEngineManager::ShareInstance == nullptr)
+        if (cocos2d::Director::getInstance() == nullptr || cocos2d::ScriptEngineManager::getInstance() == nullptr)
             return;
 
         JSB_AUTOCOMPARTMENT_WITH_GLOBAL_OBJCET
 
+        JSContext* cx = ScriptingCore::getInstance()->getGlobalContext();
         JS::RootedObject jsobj(cx, JS_NewObject(cx, NULL, JS::NullPtr(), JS::NullPtr()));
         JS::RootedValue vp(cx);
         vp = c_string_to_jsval(cx, "open");
@@ -96,11 +100,12 @@ public:
         js_proxy_t * p = jsb_get_native_proxy(ws);
         if (p == nullptr) return;
 
-        if (Director::DirectorInstance == nullptr || ScriptEngineManager::ShareInstance == nullptr)
+        if (cocos2d::Director::getInstance() == nullptr || cocos2d::ScriptEngineManager::getInstance() == nullptr)
             return;
 
         JSB_AUTOCOMPARTMENT_WITH_GLOBAL_OBJCET
 
+        JSContext* cx = ScriptingCore::getInstance()->getGlobalContext();
         JS::RootedObject jsobj(cx, JS_NewObject(cx, NULL, JS::NullPtr(), JS::NullPtr()));
         JS::RootedValue vp(cx);
         vp = c_string_to_jsval(cx, "message");
@@ -115,7 +120,6 @@ public:
                 uint8_t* bufdata = JS_GetArrayBufferData(buffer);
                 memcpy((void*)bufdata, (void*)data.bytes, data.len);
             }
-
             JS::RootedValue dataVal(cx);
             dataVal = OBJECT_TO_JSVAL(buffer);
             JS_SetProperty(cx, jsobj, "data", dataVal);
@@ -147,10 +151,11 @@ public:
         js_proxy_t * p = jsb_get_native_proxy(ws);
         if (!p) return;
 
-        if (Director::DirectorInstance && ScriptEngineManager::ShareInstance && Director::DirectorInstance->getRunningScene())
+        if (cocos2d::Director::getInstance() != nullptr && cocos2d::Director::getInstance()->getRunningScene() && cocos2d::ScriptEngineManager::getInstance() != nullptr)
         {
             JSB_AUTOCOMPARTMENT_WITH_GLOBAL_OBJCET
             
+            JSContext* cx = ScriptingCore::getInstance()->getGlobalContext();
             JS::RootedObject jsobj(cx, JS_NewObject(cx, NULL, JS::NullPtr(), JS::NullPtr()));
             JS::RootedValue vp(cx);
             vp = c_string_to_jsval(cx, "close");
@@ -159,7 +164,10 @@ public:
             JS::RootedValue args(cx, OBJECT_TO_JSVAL(jsobj));
             ScriptingCore::getInstance()->executeFunctionWithOwner(OBJECT_TO_JSVAL(_JSDelegate.ref()), "onclose", 1, args.address());
             
-            JS::RemoveObjectRoot(cx, &p->obj);
+#if not CC_ENABLE_GC_FOR_NATIVE_OBJECTS
+            auto copy = &p->obj;
+            JS::RemoveObjectRoot(cx, copy);
+#endif
             jsb_remove_proxy(p);
         }
         
@@ -174,11 +182,12 @@ public:
         js_proxy_t * p = jsb_get_native_proxy(ws);
         if (!p) return;
 
-        if (Director::DirectorInstance == nullptr || ScriptEngineManager::ShareInstance == nullptr || Director::DirectorInstance->getRunningScene() == nullptr)
+        if (cocos2d::Director::getInstance() == nullptr || cocos2d::ScriptEngineManager::getInstance() == nullptr)
             return;
 
         JSB_AUTOCOMPARTMENT_WITH_GLOBAL_OBJCET
 
+        JSContext* cx = ScriptingCore::getInstance()->getGlobalContext();
         JS::RootedObject jsobj(cx, JS_NewObject(cx, NULL, JS::NullPtr(), JS::NullPtr()));
         JS::RootedValue vp(cx);
         vp = c_string_to_jsval(cx, "error");
@@ -194,8 +203,7 @@ public:
         _JSDelegate.ref() = pJSDelegate;
     }
 private:
-    JSContext *cx;
-    mozilla::Maybe<JS::PersistentRootedObject> _JSDelegate;
+    mozilla::Maybe<JS::RootedObject> _JSDelegate;
 };
 
 JSClass  *js_cocos2dx_websocket_class;
@@ -203,56 +211,73 @@ JSObject *js_cocos2dx_websocket_prototype;
 
 void js_cocos2dx_WebSocket_finalize(JSFreeOp *fop, JSObject *obj) {
     CCLOG("jsbindings: finalizing JS object %p (WebSocket)", obj);
+    
+    JS::RootedObject jsobj(ScriptingCore::getInstance()->getGlobalContext(), obj);
+    js_proxy_t *p = jsb_get_js_proxy(jsobj);
+    if (p)
+    {
+        WebSocket *ws = (WebSocket *)(p->ptr);
+        jsb_remove_proxy(p);
+        // Manually close if web socket is not closed
+        if (ws->getReadyState() != WebSocket::State::CLOSED)
+        {
+            ws->closeAsync();
+        }
+    }
 }
 
 bool js_cocos2dx_extension_WebSocket_send(JSContext *cx, uint32_t argc, jsval *vp)
 {
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::RootedObject obj(cx, args.thisv().toObjectOrNull());
+    JS::CallArgs argv = JS::CallArgsFromVp(argc, vp);
+    JS::RootedObject obj(cx, argv.thisv().toObjectOrNull());
     js_proxy_t *proxy = jsb_get_js_proxy(obj);
     WebSocket* cobj = (WebSocket *)(proxy ? proxy->ptr : NULL);
     JSB_PRECONDITION2( cobj, cx, false, "Invalid Native Object");
 
-    if(argc == 1){
-        do
+    if(argc == 1)
+    {
+        if (argv[0].isString())
         {
-            if (args.get(0).isString())
+            ssize_t len = JS_GetStringLength(argv[0].toString());
+            std::string data;
+            jsval_to_std_string(cx, argv[0], &data);
+
+            if (data.empty() && len > 0)
             {
-                std::string data;
-                jsval_to_std_string(cx, args.get(0), &data);
-                cobj->send(data);
-                break;
+                CCLOGWARN("Text message to send is empty, but its length is greater than 0!");
+                //FIXME: Note that this text message contains '0x00' prefix, so its length calcuted by strlen is 0.
+                // we need to fix that if there is '0x00' in text message,
+                // since javascript language could support '0x00' inserted at the beginning or the middle of text message
             }
 
-            if (args.get(0).isObject())
+            cobj->send(data);
+        }
+        else if (argv[0].isObject())
+        {
+            uint8_t *bufdata = NULL;
+            uint32_t len = 0;
+
+            JS::RootedObject jsobj(cx, argv[0].toObjectOrNull());
+            if (JS_IsArrayBufferObject(jsobj))
             {
-                uint8_t *bufdata = NULL;
-                uint32_t len = 0;
-
-                JS::RootedObject jsobj(cx, args.get(0).toObjectOrNull());
-                if (JS_IsArrayBufferObject(jsobj))
-                {
-                    bufdata = JS_GetArrayBufferData(jsobj);
-                    len = JS_GetArrayBufferByteLength(jsobj);
-                }
-                else if (JS_IsArrayBufferViewObject(jsobj))
-                {
-                    bufdata = (uint8_t*)JS_GetArrayBufferViewData(jsobj);
-                    len = JS_GetArrayBufferViewByteLength(jsobj);
-                }
-
-                if (bufdata && len > 0)
-                {
-                    cobj->send(bufdata, len);
-                    break;
-                }
+                bufdata = JS_GetArrayBufferData(jsobj);
+                len = JS_GetArrayBufferByteLength(jsobj);
+            }
+            else if (JS_IsArrayBufferViewObject(jsobj))
+            {
+                bufdata = (uint8_t*)JS_GetArrayBufferViewData(jsobj);
+                len = JS_GetArrayBufferViewByteLength(jsobj);
             }
 
+            cobj->send(bufdata, len);
+        }
+        else
+        {
             JS_ReportError(cx, "data type to be sent is unsupported.");
             return false;
-        } while (0);
+        }
 
-        args.rval().setUndefined();
+        argv.rval().setUndefined();
 
         return true;
     }
@@ -330,14 +355,14 @@ bool js_cocos2dx_extension_WebSocket_constructor(JSContext *cx, uint32_t argc, j
             }
             
             cobj = new (std::nothrow) WebSocket();
-            auto delegate = new (std::nothrow) JSB_WebSocketDelegate(cx);
+            JSB_WebSocketDelegate* delegate = new (std::nothrow) JSB_WebSocketDelegate();
             delegate->setJSDelegate(obj);
             cobj->init(*delegate, url, &protocols);
         }
         else
         {
             cobj = new (std::nothrow) WebSocket();
-            auto delegate = new (std::nothrow) JSB_WebSocketDelegate(cx);
+            JSB_WebSocketDelegate* delegate = new (std::nothrow) JSB_WebSocketDelegate();
             delegate->setJSDelegate(obj);
             cobj->init(*delegate, url);
         }
@@ -350,8 +375,11 @@ bool js_cocos2dx_extension_WebSocket_constructor(JSContext *cx, uint32_t argc, j
 
         // link the native object with the javascript object
         js_proxy_t *p = jsb_new_proxy(cobj, obj);
+        CC_UNUSED_PARAM(p);
+#if not CC_ENABLE_GC_FOR_NATIVE_OBJECTS
         JS::AddNamedObjectRoot(cx, &p->obj, "WebSocket");
-
+#endif
+        
         args.rval().set(OBJECT_TO_JSVAL(obj));
         return true;
     }
@@ -423,4 +451,3 @@ void register_jsb_websocket(JSContext *cx, JS::HandleObject global)
     JS_DefineProperty(cx, jsclassObj, "CLOSING", (int)WebSocket::State::CLOSING, JSPROP_ENUMERATE | JSPROP_PERMANENT | JSPROP_READONLY);
     JS_DefineProperty(cx, jsclassObj, "CLOSED", (int)WebSocket::State::CLOSED, JSPROP_ENUMERATE | JSPROP_PERMANENT | JSPROP_READONLY);
 }
-

@@ -24,6 +24,7 @@ THE SOFTWARE.
 
 #include "ui/UITextBMFont.h"
 #include "2d/CCLabel.h"
+#include "editor-support/cocostudio/CocosStudioExtension.h"
 
 NS_CC_BEGIN
 
@@ -85,7 +86,7 @@ void TextBMFont::setFntFile(const std::string& fileName)
         return;
     }
     _fntFileName = fileName;
-    _labelBMFontRenderer->setBMFontFilePath(fileName);
+    _labelBMFontRenderer->setBMFontFilePath(fileName, nullptr);
 
     updateContentSizeWithTextureSize(_labelBMFontRenderer->getContentSize());
     _labelBMFontRendererAdaptDirty = true;
@@ -180,13 +181,19 @@ void TextBMFont::copySpecialProperties(Widget *widget)
     }
 }
 
+ResourceData TextBMFont::getRenderFile()
+{
+    ResourceData rData;
+    rData.type = 0;
+    rData.file = _fntFileName;
+    return rData;
+}
+
 void TextBMFont::resetRender()
 {
     removeProtectedChild(_labelBMFontRenderer);
     initRenderer();
 }
-
 }
 
 NS_CC_END
-

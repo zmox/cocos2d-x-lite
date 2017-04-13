@@ -22,14 +22,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ****************************************************************************/
 
-#include "cocostudio/CCActionNode.h"
-#include "cocostudio/CCActionFrameEasing.h"
+#include "editor-support/cocostudio/CCActionNode.h"
+#include "editor-support/cocostudio/CCActionFrameEasing.h"
 #include "ui/UIWidget.h"
 #include "ui/UIHelper.h"
 #include "ui/UILayout.h"
-#include "cocostudio/CocoLoader.h"
+#include "editor-support/cocostudio/CocoLoader.h"
 #include "base/ccUtils.h"
+<<<<<<< HEAD
 #include "cocostudio/CCActionManagerEx.h"
+=======
+#include "editor-support/cocostudio/CCActionManagerEx.h"
+
+>>>>>>> upstream/v1.4
 
 using namespace cocos2d;
 using namespace ui;
@@ -77,12 +82,12 @@ ActionNode::~ActionNode()
 
 void ActionNode::initWithDictionary(const rapidjson::Value& dic, Ref* root)
 {
-    auto rw = dynamic_cast<Widget*>(root);
+    Widget * rw = dynamic_cast<Widget *>(root);
     if (nullptr == rw)
         return;
 
     setActionTag(DICTOOL->getIntValue_json(dic, "ActionTag"));
-    auto node = Helper::seekActionWidgetByActionTag(rw, getActionTag());
+    Widget* node = Helper::seekActionWidgetByActionTag(rw, getActionTag());
     bool positionOffset = node && (nullptr == (dynamic_cast<Layout *>(node)));
 
     int actionFrameCount = DICTOOL->getArrayCount_json(dic, "actionframelist");
@@ -455,20 +460,31 @@ Spawn * ActionNode::refreshActionProperty()
 
         Vector<FiniteTimeAction*> cSequenceArray;
         auto frameCount = cArray->size();
-        for (int i = 0; i < frameCount; i++)
+        if(frameCount > 1)
+        { 
+            for (int i = 0; i < frameCount; i++)
+            {
+                auto frame = cArray->at(i);
+                if (i == 0)
+                {
+                }
+                else
+                {
+                    auto srcFrame = cArray->at(i-1);
+                    float duration = (frame->getFrameIndex() - srcFrame->getFrameIndex()) * getUnitTime();
+                    Action* cAction = frame->getAction(duration);
+                    if(cAction != nullptr)
+                    cSequenceArray.pushBack(static_cast<FiniteTimeAction*>(cAction));
+                }
+            }
+        }
+        else if (frameCount == 1)
         {
-            auto frame = cArray->at(i);
-            if (i == 0)
-            {
-            }
-            else
-            {
-                auto srcFrame = cArray->at(i-1);
-                float duration = (frame->getFrameIndex() - srcFrame->getFrameIndex()) * getUnitTime();
-                Action* cAction = frame->getAction(duration);
-                if(cAction != nullptr)
+            auto frame = cArray->at(0);
+            float duration = 0.0f;
+            Action* cAction = frame->getAction(duration);
+            if (cAction != nullptr)
                 cSequenceArray.pushBack(static_cast<FiniteTimeAction*>(cAction));
-            }
         }
         Sequence* cSequence = Sequence::create(cSequenceArray);
         if (cSequence != nullptr)
@@ -479,12 +495,12 @@ Spawn * ActionNode::refreshActionProperty()
 
     if (_action == nullptr)
     {
-    CC_SAFE_RELEASE_NULL(_actionSpawn);
+        CC_SAFE_RELEASE_NULL(_actionSpawn);
     }
     else
     {
-    CC_SAFE_RELEASE_NULL(_action);
-    CC_SAFE_RELEASE_NULL(_actionSpawn);
+        CC_SAFE_RELEASE_NULL(_action);
+        CC_SAFE_RELEASE_NULL(_actionSpawn);
     }
 
     _actionSpawn = Spawn::create(cSpawnArray);
@@ -654,4 +670,3 @@ bool ActionNode::isActionDoneOnce()
 }
 
 }
-

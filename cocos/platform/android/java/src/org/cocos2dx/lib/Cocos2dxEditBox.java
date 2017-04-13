@@ -99,6 +99,11 @@ public class Cocos2dxEditBox extends EditText {
      */
     private final int kEditBoxInputFlagInitialCapsAllCharacters = 4;
 
+    /**
+     *  Lowercase all characters automatically.
+     */
+    private final int kEditBoxInputFlagLowercaseAllCharacters = 5;
+
     private final int kKeyboardReturnTypeDefault = 0;
     private final int kKeyboardReturnTypeDone = 1;
     private final int kKeyboardReturnTypeSend = 2;
@@ -125,6 +130,42 @@ public class Cocos2dxEditBox extends EditText {
         layoutParams.height = maxHeight;
         layoutParams.gravity = Gravity.TOP | Gravity.LEFT;
         this.setLayoutParams(layoutParams);
+    }
+
+    public void setInputTextAlignment(int hAlign, int vAlign) {
+        int gravity;
+
+        switch (hAlign) {
+            case 0:
+                gravity = Gravity.LEFT;
+                break;
+            case 1:
+                gravity = Gravity.CENTER_HORIZONTAL;
+                break;
+            case 2:
+                gravity = Gravity.RIGHT;
+                break;
+            default:
+                gravity = Gravity.LEFT;
+                break;
+        }
+
+        switch (vAlign) {
+            case 0:
+                gravity = gravity | Gravity.TOP;
+                break;
+            case 1:
+                gravity = gravity | Gravity.CENTER_VERTICAL;
+                break;
+            case 2:
+                gravity = gravity | Gravity.BOTTOM;
+                break;
+            default:
+                gravity = gravity | Gravity.CENTER_VERTICAL;
+                break;
+        }
+
+        this.setGravity(gravity);
     }
 
     public float getOpenGLViewScaleX() {
@@ -170,10 +211,11 @@ public class Cocos2dxEditBox extends EditText {
     }
 
     public  void setInputMode(int inputMode){
-
+        this.setInputTextAlignment(0, 1);
         switch (inputMode) {
             case kEditBoxInputModeAny:
                 this.mInputModeConstraints = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE;
+                this.setInputTextAlignment(0, 0);
                 break;
             case kEditBoxInputModeEmailAddr:
                 this.mInputModeConstraints = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS;
@@ -206,8 +248,9 @@ public class Cocos2dxEditBox extends EditText {
     public boolean onKeyDown(final int pKeyCode, final KeyEvent pKeyEvent) {
         switch (pKeyCode) {
             case KeyEvent.KEYCODE_BACK:
+                Cocos2dxActivity activity = (Cocos2dxActivity)this.getContext();
                 //To prevent program from going to background
-                Cocos2dxActivity.COCOS_ACTIVITY.getGLSurfaceView().requestFocus();
+                activity.getGLSurfaceView().requestFocus();
                 return true;
             default:
                 return super.onKeyDown(pKeyCode, pKeyEvent);
@@ -239,6 +282,9 @@ public class Cocos2dxEditBox extends EditText {
             case kEditBoxInputFlagInitialCapsAllCharacters:
                 this.mInputFlagConstraints = InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS;
                 break;
+            case kEditBoxInputFlagLowercaseAllCharacters:
+                this.mInputFlagConstraints = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_NORMAL;
+                break;
             default:
                 break;
         }
@@ -246,4 +292,3 @@ public class Cocos2dxEditBox extends EditText {
         this.setInputType(this.mInputFlagConstraints | this.mInputModeConstraints);
     }
 }
-

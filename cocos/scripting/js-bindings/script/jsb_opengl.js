@@ -79,7 +79,7 @@ gl.deleteTexture = function(texture) {
     gl._deleteTexture(texture_id);
 };
 
-gl.deleteBuffer = function(bufer) {
+gl.deleteBuffer = function(buffer) {
     var buffer_id = buffer.buffer_id;
     // Accept numbers too. eg: gl.deleteBuffer(0)
     if( typeof buffer === 'number' )
@@ -88,7 +88,7 @@ gl.deleteBuffer = function(bufer) {
     gl._deleteBuffer(buffer_id);
 };
 
-gl.deleteRenderbuffer = function(bufer) {
+gl.deleteRenderbuffer = function(buffer) {
     var buffer_id = buffer.renderbuffer_id;
     // Accept numbers too. eg: gl.deleteRenderbuffer(0)
     if( typeof buffer === 'number' )
@@ -97,7 +97,7 @@ gl.deleteRenderbuffer = function(bufer) {
     gl._deleteRenderbuffer(renderbuffer_id);
 };
 
-gl.deleteFramebuffer = function(bufer) {
+gl.deleteFramebuffer = function(buffer) {
     var buffer_id = buffer.framebuffer_id;
     // Accept numbers too. eg: gl.deleteFramebuffer(0)
     if( typeof buffer === 'number' )
@@ -353,11 +353,11 @@ gl.getAttachedShaders = function(program) {
 // void texImage2D(GLenum target, GLint level, GLenum internalformat, GLenum format, GLenum type, HTMLImageElement image); // May throw DOMException
 // void texImage2D(GLenum target, GLint level, GLenum internalformat, GLenum format, GLenum type, HTMLCanvasElement canvas); // May throw DOMException
 // void texImage2D(GLenum target, GLint level, GLenum internalformat, GLenum format, GLenum type, HTMLVideoElement video); // May throw DOMException
-gl.texImage2D = function() {
-    if( arguments.length !=  9)
-        throw "texImage2D: Unsupported number of parameters:" + arguments.length;
-
-    gl._texImage2D.apply(this, arguments);
+gl.texImage2D = function (...args) {
+    if (args.length < 9) {
+        throw "texImage2D: Unsupported number of parameters:" + args.length;
+    }
+    gl._texImage2D.apply(gl, args);
 };
 
 // XXX: Currently only the 1st one is supported
@@ -366,11 +366,11 @@ gl.texImage2D = function() {
 // void texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLenum format, GLenum type, HTMLImageElement image); // May throw DOMException
 // void texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLenum format, GLenum type, HTMLCanvasElement canvas); // May throw DOMException
 // void texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLenum format, GLenum type, HTMLVideoElement video); // May throw DOMException
-gl.texSubImage2D = function() {
-    if( arguments.length !=  9)
+gl.texSubImage2D = function (...args) {
+    if (args.length < 9)
         throw "texImage2D: Unsupported number of parameters";
 
-    gl._texSubImage2D.apply(this, arguments);
+    gl._texSubImage2D.apply(gl, args);
 };
 
 //

@@ -20,6 +20,8 @@
  * THE SOFTWARE.
  */
 
+'use strict';
+
 /************************************************************
  *
  * Constructors with built in init function
@@ -64,19 +66,6 @@ _p._ctor = function(start, end, v, colorStops) {
 };
 
 
-_p = cc.LayerMultiplex.prototype;
-_p._ctor = function(layers) {
-    if(layers !== undefined){
-        if (layers instanceof Array)
-            cc.LayerMultiplex.prototype.initWithArray.call(this, layers);
-        else
-            cc.LayerMultiplex.prototype.initWithArray.call(this, Array.prototype.slice.call(arguments));
-    }else{
-        cc.LayerMultiplex.prototype.init.call(this);
-    }
-};
-
-
 /************************  Sprite  *************************/
 
 _p = cc.Sprite.prototype;
@@ -108,15 +97,6 @@ _p._ctor = function(fileName, rect) {
     }
 };
 
-_p = cc.SpriteBatchNode.prototype;
-_p._ctor = function(fileImage, capacity) {
-    capacity = capacity || cc.SpriteBatchNode.DEFAULT_CAPACITY;
-    if (typeof(fileImage) == 'string')
-        this.initWithFile(fileImage, capacity);
-    else
-        this.initWithTexture(fileImage, capacity);
-};
-
 _p = cc.SpriteFrame.prototype;
 _p._ctor = function(filename, rect, rotated, offset, originalSize){
     if(originalSize !== undefined){
@@ -129,169 +109,6 @@ _p._ctor = function(filename, rect, rotated, offset, originalSize){
             this.initWithTexture(filename, rect);
         else
             this.initWithTextureFilename(filename, rect);
-    }
-};
-
-/*****************************  effect   *******************************/
-_p = cc.GridBase.prototype;
-_p._ctor = function(gridSize, texture, flipped){
-    if(gridSize !== undefined)
-        this.initWithSize(gridSize, texture, flipped);
-};
-
-_p = cc.Grid3D.prototype;
-_p._ctor = function(gridSize, texture, flipped){
-    if(gridSize !== undefined)
-        this.initWithSize(gridSize, texture, flipped);
-};
-
-_p = cc.TiledGrid3D.prototype;
-_p._ctor = function(gridSize, texture, flipped){
-    if(gridSize !== undefined)
-        this.initWithSize(gridSize, texture, flipped);
-};
-/************************  Menu and menu items  *************************/
-
-_p = cc.Menu.prototype;
-_p._ctor = function(menuItems) {
-    if((arguments.length > 0) && (arguments[arguments.length-1] == null))
-        cc.log('parameters should not be ending with null in Javascript');
-
-    var argc = arguments.length,
-        items = [];
-    if (argc == 1) {
-        if (menuItems instanceof Array) {
-            items = menuItems;
-        }
-        else{
-            items.push(arguments[0]);
-        }
-    }
-    else if (argc > 1) {
-        for (var i = 0; i < argc; i++) {
-            if (arguments[i])
-                items.push(arguments[i]);
-        }
-    }
-
-    if(items && items.length > 0)
-        this.initWithArray(items);
-    else
-        this.init();
-};
-
-
-_p = cc.MenuItem.prototype;
-_p._ctor = function(callback, target) {
-    callback && this.initWithCallback(callback.bind(target));
-};
-
-_p = cc.MenuItemLabel.prototype;
-_p._ctor = function(label, callback, target) {
-    callback = callback ? callback.bind(target) : null;
-    label && this.initWithLabel(label, callback);
-};
-
-_p = cc.MenuItemAtlasFont.prototype;
-_p._ctor = function(value, charMapFile, itemWidth, itemHeight, startCharMap, callback, target) {
-    callback = callback ? callback.bind(target) : null;
-    value !== undefined && this.initWithString(value, charMapFile, itemWidth, itemHeight, startCharMap, callback);
-};
-
-_p = cc.MenuItemFont.prototype;
-_p._ctor = function(value, callback, target) {
-    callback = callback ? callback.bind(target) : null;
-    value !== undefined && this.initWithString(value, callback);
-};
-
-_p = cc.MenuItemSprite.prototype;
-_p._ctor = function(normalSprite, selectedSprite, three, four, five) {
-    if (normalSprite) {
-        normalSprite = normalSprite;
-        selectedSprite = selectedSprite || null;
-        var disabledSprite, target, callback;
-        if (five) {
-            disabledSprite = three;
-            callback = four;
-            target = five;
-        } else if (four && typeof four === 'function') {
-            disabledSprite = three;
-            callback = four;
-        } else if (four && typeof three === 'function') {
-            target = four;
-            callback = three;
-            disabledSprite = normalSprite;
-        } else if (three === undefined) {
-            disabledSprite = normalSprite;
-        }
-        callback = callback ? callback.bind(target) : null;
-        this.initWithNormalSprite(normalSprite, selectedSprite, disabledSprite, callback);
-    }
-};
-
-_p = cc.MenuItemImage.prototype;
-_p._ctor = function(normalImage, selectedImage, three, four, five) {
-    var disabledImage = null,
-        callback = null,
-        target = null;
-
-    if (!normalImage) {
-        //undefined || null || ''
-        cc.MenuItemImage.prototype.init.call(this);
-    }
-    else {
-        var imageIndex = 0;
-        var imageArray = new Array();
-        for (var i = 0; i < arguments.length && i < 5; ++i) {
-            if(typeof arguments[i] === 'function')
-                callback = arguments[i];
-            else if (typeof arguments[i] === 'object')
-                target = arguments[i];
-            else if (typeof arguments[i] === 'string')
-            {
-                imageArray[imageIndex] = arguments[i];
-                imageIndex += 1;
-            }
-        }
-
-        if(!callback)
-            callback = null;
-        else if(callback && target)
-            callback = callback.bind(target);
-
-        var normalSprite = new cc.Sprite(normalImage);
-        var selectedSprite = imageArray[1] ? new cc.Sprite(imageArray[1]) : new cc.Sprite(normalImage);
-        var disabledSprite = imageArray[2] ? new cc.Sprite(imageArray[2]) : new cc.Sprite(normalImage);
-        this.initWithNormalSprite(normalSprite, selectedSprite, disabledSprite, callback);
-    }
-};
-
-_p = cc.MenuItemToggle.prototype;
-_p._ctor = function() {
-    var argc =  arguments.length, callback, target;
-    // passing callback.
-    if (typeof arguments[argc-2] === 'function') {
-        callback = arguments[argc-2];
-        target = arguments[argc-1];
-        argc = argc - 2;
-    } else if(typeof arguments[argc-1] === 'function'){
-        callback = arguments[argc-1];
-        argc = argc - 1;
-    }
-
-    if(argc > 0) {
-        this.initWithItem(arguments[0]);
-
-        for (var i = 1; i < argc; i++) {
-            if (arguments[i])
-                this.addSubItem(arguments[i]);
-        }
-        if (callback)
-            target ? this.setCallback(callback, target) : this.setCallback(callback);
-    }
-    else {
-        callback = callback ? callback.bind(target) : null;
-        this.initWithCallback(callback);
     }
 };
 
@@ -337,31 +154,6 @@ cc.ParticleSmoke.prototype._ctor = dummyCtor;
 cc.ParticleRain.prototype._ctor = dummyCtor;
 cc.ParticleSnow.prototype._ctor = dummyCtor;
 
-
-
-/************************  ProgressTimer  *************************/
-_p = cc.ProgressTimer.prototype;
-_p._ctor = function(sprite){
-    sprite !== undefined && this.initWithSprite(sprite);
-};
-
-/************************  TextFieldTTF  *************************/
-_p = cc.TextFieldTTF.prototype;
-_p._ctor = function(placeholder, dimensions, alignment, fontName, fontSize){
-    if(fontSize !== undefined){
-        this.initWithPlaceHolder('', dimensions, alignment, fontName, fontSize);
-        if(placeholder)
-            this._placeHolder = placeholder;
-    }
-    else if(fontName === undefined && alignment !== undefined){
-        fontName = arguments[1];
-        fontSize = arguments[2];
-        this.initWithString('', fontName, fontSize);
-        if(placeholder)
-            this._placeHolder = placeholder;
-    }
-};
-
 /************************  RenderTexture  *************************/
 _p = cc.RenderTexture.prototype;
 _p._ctor = function(width, height, format, depthStencilFormat){
@@ -403,23 +195,6 @@ _p._ctor = function(tmxFile, resourcePath){
     }
 };
 
-/************************  TransitionScene  *************************/
-_p = cc.TransitionScene.prototype;
-_p._ctor = function(t, scene){
-    if(t !== undefined && scene !== undefined)
-        this.initWithDuration(t, scene);
-};
-
-_p = cc.TransitionSceneOriented.prototype;
-_p._ctor = function(t, scene, orientation){
-    orientation != undefined && this.initWithDuration(t, scene, orientation);
-};
-
-_p = cc.TransitionPageTurn.prototype;
-_p._ctor = function(t, scene, backwards){
-    backwards != undefined && this.initWithDuration(t, scene, backwards);
-};
-
 /************************  Actions  *************************/
 
 cc.Speed.prototype._ctor = function(action, speed) {
@@ -428,8 +203,8 @@ cc.Speed.prototype._ctor = function(action, speed) {
 
 cc.Follow.prototype._ctor = function (followedNode, rect) {
     if(followedNode)
-        rect ? ret.initWithTarget(followedNode, rect)
-             : ret.initWithTarget(followedNode);
+        rect ? this.initWithTarget(followedNode, rect)
+             : this.initWithTarget(followedNode);
 };
 
 cc.OrbitCamera.prototype._ctor = function (t, radius, deltaRadius, angleZ, deltaAngleZ, angleX, deltaAngleX) {
@@ -566,8 +341,8 @@ cc.ActionInterval.prototype._ctor = function(d) {
     d !== undefined && this.initWithDuration(d);
 };
 
-cc.Sequence.prototype._ctor = function(tempArray) {
-    var paramArray = (tempArray instanceof Array) ? tempArray : arguments;
+cc.Sequence.prototype._ctor = function(...args) {
+    var paramArray = (args[0] instanceof Array) ? args[0] : args;
     var last = paramArray.length - 1;
     if ((last >= 0) && (paramArray[last] == null))
         cc.log('parameters should not be ending with null in Javascript');
@@ -591,8 +366,8 @@ cc.RepeatForever.prototype._ctor = function(action) {
     action !== undefined && this.initWithAction(action);
 };
 
-cc.Spawn.prototype._ctor = function(tempArray) {
-    var paramArray = (tempArray instanceof Array) ? tempArray : arguments;
+cc.Spawn.prototype._ctor = function(...args) {
+    var paramArray = (args[0] instanceof Array) ? args[0] : args;
     var last = paramArray.length - 1;
     if ((last >= 0) && (paramArray[last] == null))
         cc.log('parameters should not be ending with null in Javascript');
@@ -648,16 +423,11 @@ cc.BezierBy.prototype._ctor = cc.BezierTo.prototype._ctor = function(t, c) {
     c !== undefined && this.initWithDuration(t, c);
 };
 
-cc.ScaleTo.prototype._ctor = cc.ScaleBy.prototype._ctor = function(duration, sx, sy, sz) {
-    if (typeof sx === 'number') {
-        if (typeof sy === 'number') {
-            if (typeof sz === 'number')
-                this.initWithDuration(duration, sx, sy, sz);
-            else
-                this.initWithDuration(duration, sx, sy);
-        }
-        else
-            this.initWithDuration(duration, sx);
+cc.ScaleTo.prototype._ctor = cc.ScaleBy.prototype._ctor = function(duration, sx, sy) {
+    if (sx !== undefined) {
+        if (sy !== undefined)
+            this.initWithDuration(duration, sx, sy);
+        else this.initWithDuration(duration, sx);
     }
 };
 
@@ -766,10 +536,6 @@ cc.AnimationFrame.prototype._ctor = function(spriteFrame, delayUnits, userInfo) 
 
 /************************  Nodes  *************************/
 
-cc.AtlasNode.prototype._ctor = function(tile, tileWidth, tileHeight, itemsToRender) {
-    itemsToRender !== undefined && this.initWithTileFile(tile, tileWidth, tileHeight, itemsToRender);
-};
-
 cc.ClippingNode.prototype._ctor = function(stencil) {
     if(stencil != undefined)
         cc.ClippingNode.prototype.init.call(this, stencil);
@@ -781,30 +547,11 @@ cc.DrawNode.prototype._ctor = function() {
     cc.DrawNode.prototype.init.call(this);
 };
 
-cc.LabelAtlas.prototype._ctor = function(strText, charMapFile, itemWidth, itemHeight, startCharMap) {
-    if(startCharMap != undefined){
-        startCharMap = startCharMap.charCodeAt(0);
-        cc.LabelAtlas.prototype.initWithString.call(this, strText, charMapFile, itemWidth, itemHeight, startCharMap);
-    }else if(charMapFile != undefined){
-        this.initWithString(strText, charMapFile);
-    }
-};
-
-cc.LabelBMFont.prototype._ctor = function(str, fntFile, width, alignment, imageOffset) {
-    if( fntFile ) {
-        str = str || '';
-        width = width || 0;
-        alignment = alignment ? alignment : cc.TEXT_ALIGNMENT_LEFT;
-        imageOffset = imageOffset || cc.p(0, 0);
-        cc.LabelBMFont.prototype.initWithString.call(this, str, fntFile, width, alignment, imageOffset);
-    }
-};
-
-cc.LabelTTF.prototype._ctor = function(text, fontName, fontSize, dimensions, hAlignment, vAlignment) {
+cc.LabelTTF.prototype._ctor = function (text, fontName, fontSize, dimensions, hAlignment, vAlignment) {
     this._flippedX = false;
     this._flippedY = false;
     this._renderLabel = this.getRenderLabel();
-    if (arguments.length <= 0) {
+    if (text === undefined) {
         return;
     }
     
@@ -814,15 +561,13 @@ cc.LabelTTF.prototype._ctor = function(text, fontName, fontSize, dimensions, hAl
     }
     else {
         fontName = fontName || '';
-        if(!fontSize)
-            fontSize = 16;
+        fontSize = fontSize || 16;
         dimensions = dimensions || cc.size(0,0);
-        hAlignment = hAlignment ? hAlignment : cc.TEXT_ALIGNMENT_LEFT;
-        vAlignment = vAlignment ? vAlignment : cc.VERTICAL_TEXT_ALIGNMENT_TOP;
+        hAlignment = hAlignment === undefined ? cc.TEXT_ALIGNMENT_LEFT : hAlignment;
+        vAlignment = vAlignment === undefined ? cc.VERTICAL_TEXT_ALIGNMENT_TOP : vAlignment;
         this.initWithString(text, fontName, fontSize, dimensions, hAlignment, vAlignment);
     }
 };
-
 
 /************************  Other classes  *************************/
 
@@ -840,393 +585,3 @@ cc.GLProgram.prototype._ctor = function(vShaderFileName, fShaderFileName) {
         cc.GLProgram.prototype.updateUniforms.call(this);
     }
 };
-
-/************************************************************
- *
- * Unified create function
- *
- ************************************************************/
-
-/**
- * Create a sprite with image path or frame name or texture or spriteFrame.
- * @constructs
- * @param {String|cc.Texture2D|cc.SpriteFrame} fileName  The string which indicates a path to image file, e.g., 'scene1/monster.png'.
- * @param {cc.Rect} rect  Only the contents inside rect of pszFileName's texture will be applied for this sprite.
- * @return {cc.Sprite} A valid sprite object
- * @example
- *
- * 1.Create a sprite with image path and rect
- * var sprite1 = cc.Sprite.create('res/HelloHTML5World.png');
- * var sprite2 = cc.Sprite.create('res/HelloHTML5World.png',cc.rect(0,0,480,320));
- *
- * 2.Create a sprite with a sprite frame name. Must add '#' before frame name.
- * var sprite = cc.Sprite.create('#grossini_dance_01.png');
- *
- * 3.Create a sprite with a sprite frame
- * var spriteFrame = cc.spriteFrameCache.getSpriteFrame('grossini_dance_01.png');
- * var sprite = cc.Sprite.create(spriteFrame);
- *
- * 4.Create a sprite with an exsiting texture contained in a CCTexture2D object
- *      After creation, the rect will be the size of the texture, and the offset will be (0,0).
- * var texture = cc.textureCache.addImage('HelloHTML5World.png');
- * var sprite1 = cc.Sprite.create(texture);
- * var sprite2 = cc.Sprite.create(texture, cc.rect(0,0,480,320));
- *
- */
- cc.Sprite.createWithTexture = function (texture, texture_rect, rotated) {
-    var ret = new cc.Sprite();
-    switch(arguments.length)
-    {
-        case 1:
-            ret.initWithTexture(texture);
-            break;
-        case 2:
-            ret.initWithTexture(texture,texture_rect);
-            break;
-        case 3:
-            ret.initWithTexture(texture,texture_rect, rotated);
-            break;
-        default:
-            break;
-    }
-
-    return ret;
-};
-
-cc.Sprite.createWithSpriteFrame = function (spriteFrame) {
-    var ret = new cc.Sprite();
-    if (arguments.length > 0) {
-        ret.initWithSpriteFrame(spriteFrame);
-    }
-
-    return ret;
-};
-
-cc.Sprite.create = function (fileName, rect) {
-    var sprite;
-
-    if (arguments.length == 0) {
-        sprite = cc.Sprite._create();
-        return sprite;
-    }
-
-    if (typeof(fileName) === "string") {
-        if (fileName[0] === "#") {
-            //init with a sprite frame name
-            var frameName = fileName.substr(1, fileName.length - 1);
-            var spriteFrame = cc.spriteFrameCache.getSpriteFrame(frameName);
-            sprite = cc.Sprite.createWithSpriteFrame(spriteFrame);
-        } else {
-            // Create with filename and rect
-            sprite = rect ? cc.Sprite._create(fileName, rect) : cc.Sprite._create(fileName);
-        }
-        if (sprite)
-            return sprite;
-        else return null;
-    }
-
-    if (typeof(fileName) === "object") {
-        if (fileName instanceof cc.Texture2D) {
-            //init  with texture and rect
-            sprite = rect ? cc.Sprite.createWithTexture(fileName, rect) : cc.Sprite.createWithTexture(fileName);
-        } else if (fileName instanceof cc.SpriteFrame) {
-            //init with a sprite frame
-            sprite = cc.Sprite.createWithSpriteFrame(fileName);
-        }
-        if (sprite)
-            return  sprite;
-        else return null;
-    }
-
-    return null;
-};
-
-cc.SpriteBatchNode._create = cc.SpriteBatchNode.create;
-/**
- * <p>
- *    creates a cc.SpriteBatchNodeCanvas with a file image (.png, .jpg etc) with a default capacity of 29 children.<br/>
- *    The capacity will be increased in 33% in runtime if it run out of space.<br/>
- *    The file will be loaded using the TextureMgr.<br/>
- * </p>
- * @param {String|cc.Texture2D} fileImage
- * @param {Number} capacity
- * @return {cc.SpriteBatchNode}
- * @example
- * 1.
- * //create a SpriteBatchNode with image path
- * var spriteBatchNode = cc.SpriteBatchNode.create('res/animations/grossini.png', 50);
- * 2.
- * //create a SpriteBatchNode with texture
- * var texture = cc.textureCache.addImage('res/animations/grossini.png');
- * var spriteBatchNode = cc.SpriteBatchNode.create(texture,50);
- */
-cc.SpriteBatchNode.create = function(fileName, capacity){
-    if (typeof(fileName) === "string")
-        return cc.SpriteBatchNode._create(fileName);
-    else if (fileName instanceof cc.Texture2D) {
-        return isNaN(capacity) ? cc.SpriteBatchNode.createWithTexture(fileName) :  cc.SpriteBatchNode.createWithTexture(fileName,capacity);
-    }
-    return null;
-};
-
-
-cc.SpriteFrame._create = cc.SpriteFrame.create;
-/**
- * <p>
- *    Create a cc.SpriteFrame with a texture filename, rect, rotated, offset and originalSize in pixels.<br/>
- *    The originalSize is the size in pixels of the frame before being trimmed.
- * </p>
- * @param {String|cc.Texture2D} filename
- * @param {cc.Rect} rect if parameters' length equal 2, rect in points, else rect in pixels
- * @param {Boolean} rotated
- * @param {cc.Point} offset
- * @param {cc.Size} originalSize
- * @return {cc.SpriteFrame}
- * @example
- * 1.
- * //Create a cc.SpriteFrame with image path
- * var frame1 = cc.SpriteFrame.create('res/grossini_dance.png',cc.rect(0,0,90,128));
- * var frame2 = cc.SpriteFrame.create('res/grossini_dance.png',cc.rect(0,0,90,128),false,0,cc.size(90,128));
- *
- * 2.
- * //Create a cc.SpriteFrame with a texture, rect, rotated, offset and originalSize in pixels.
- * var texture = cc.textureCache.addImage('res/grossini_dance.png');
- * var frame1 = cc.SpriteFrame.create(texture, cc.rect(0,0,90,128));
- * var frame2 = cc.SpriteFrame.create(texture, cc.rect(0,0,90,128),false,0,cc.size(90,128));
- */
-cc.SpriteFrame.create = function(fileName, rect, rotated, offset, originalSize){
-    var spriteFrame = null;
-    switch (arguments.length) {
-        case 2:
-            if (fileName instanceof cc.Texture2D)
-                spriteFrame = cc.SpriteFrame.createWithTexture(fileName, rect);
-            else spriteFrame = cc.SpriteFrame._create(fileName, rect);
-            break;
-        case 5:
-            spriteFrame = cc.SpriteFrame._create(fileName, rect, rotated, offset, originalSize);
-            break;
-        default:
-            throw "Argument must be non-nil ";
-            break;
-    }
-    return spriteFrame;
-};
-
-
-cc.ParticleSystem._create = cc.ParticleSystem.create;
-/**
- * <p> return the string found by key in dict. <br/>
- *    This plist files can be create manually or with Particle Designer:<br/>
- *    http://particledesigner.71squared.com/<br/>
- * </p>
- * @param {String|Number} plistFile
- * @return {cc.ParticleSystem}
- */
-cc.ParticleSystem.create = function(plistFile){
-    var particleSystem =null;
-    if (typeof(plistFile) === "number") {
-        particleSystem = cc.ParticleSystem.createWithTotalParticles(plistFile);
-    }else if(typeof(plistFile) === "string" || typeof(plistFile) === "object"){
-        particleSystem = cc.ParticleSystem._create(plistFile);
-    }
-    return particleSystem;
-};
-
-
-cc.ParticleBatchNode._create = cc.ParticleBatchNode.create;
-/**
- * initializes the particle system with the name of a file on disk (for a list of supported formats look at the cc.Texture2D class), a capacity of particles
- * @param {String|cc.Texture2D} fileImage
- * @param {Number} capacity
- * @return {cc.ParticleBatchNode}
- * @example
- * 1.
- * //Create a cc.ParticleBatchNode with image path  and capacity
- * var particleBatchNode = cc.ParticleBatchNode.create('res/grossini_dance.png',30);
- *
- * 2.
- * //Create a cc.ParticleBatchNode with a texture and capacity
- * var texture = cc.TextureCache.getInstance().addImage('res/grossini_dance.png');
- * var particleBatchNode = cc.ParticleBatchNode.create(texture, 30);
- */
-cc.ParticleBatchNode.create = function(fileImage, capacity){
-    if (typeof(fileImage) == "string")
-        return cc.ParticleBatchNode._create(fileImage);
-    else if (fileImage instanceof cc.Texture2D) {
-        return isNaN(capacity) ? cc.ParticleBatchNode.createWithTexture(fileImage) :  cc.ParticleBatchNode.createWithTexture(fileImage, capacity);
-    }
-    return null;
-};
-
-
-cc.TMXTiledMap._create = cc.TMXTiledMap.create;
-/**
- * Creates a TMX Tiled Map with a TMX file  or content string.
- * Implementation cc.TMXTiledMap
- * @param {String} tmxFile tmxFile fileName or content string
- * @param {String} resourcePath   If tmxFile is a file name ,it is not required.If tmxFile is content string ,it is must required.
- * @return {cc.TMXTiledMap|undefined}
- * @example
- * //example
- * 1.
- * //create a TMXTiledMap with file name
- * var tmxTiledMap = cc.TMXTiledMap.create('res/orthogonal-test1.tmx');
- * 2.
- * //create a TMXTiledMap with content string and resource path
- * var resources = 'res/TileMaps';
- * var filePath = 'res/TileMaps/orthogonal-test1.tmx';
- * var xmlStr = cc.loader.getRes(filePath);
- * var tmxTiledMap = cc.TMXTiledMap.create(xmlStr, resources);
- */
-cc.TMXTiledMap.create = function (tmxFile, resourcePath) {
-    if(resourcePath != undefined){
-        return cc.TMXTiledMap.createWithXML(tmxFile, resourcePath);
-    } else if (tmxFile != undefined) {
-        return cc.TMXTiledMap._create(tmxFile);
-    }
-    return null;
-};
-
-
-// MenuItems
-cc.MenuItem.create = function (callback, target) {
-    return new cc.MenuItem(callback, target);
-};
-cc.MenuItemLabel.create = function (label, selector, target) {
-    return new cc.MenuItemLabel(label, selector, target);
-};
-cc.MenuItemAtlasFont.create = function (value, charMapFile, itemWidth, itemHeight, startCharMap, callback, target) {
-    return new cc.MenuItemAtlasFont(value, charMapFile, itemWidth, itemHeight, startCharMap, callback, target);
-};
-cc.MenuItemFont.create = function (value, callback, target) {
-    return new cc.MenuItemFont(value, callback, target);
-};
-cc.MenuItemSprite.create = function (normalSprite, selectedSprite, three, four, five) {
-    return new cc.MenuItemSprite(normalSprite, selectedSprite, three, four, five || undefined);
-};
-cc.MenuItemImage.create = function(normalImage, selectedImage, three, four, five) {
-    return new cc.MenuItemImage(normalImage, selectedImage, three, four, five);
-};
-cc.MenuItemToggle.create = function(/* var args */) {
-    var n = arguments.length;
-
-    if (typeof arguments[n-2] === 'function' || typeof arguments[n-1] === 'function')   {
-        var args = Array.prototype.slice.call(arguments);
-        var obj = null;
-        if( typeof arguments[n-2] === 'function' )
-            obj = args.pop();
-
-        var func = args.pop();
-
-        // create it with arguments,
-        var item = cc.MenuItemToggle._create.apply(this, args);
-
-        // then set the callback
-        if( obj !== null )
-            item.setCallback(func, obj);
-        else
-            item.setCallback(func);
-        return item;
-    } else {
-        return cc.MenuItemToggle._create.apply(this, arguments);
-    }
-};
-
-
-// LabelAtlas
-cc.LabelAtlas.create = function( a,b,c,d,e ) {
-
-    var n = arguments.length;
-
-    if ( n == 5) {
-        return cc.LabelAtlas._create(a,b,c,d,e.charCodeAt(0));
-    } else {
-        return cc.LabelAtlas._create.apply(this, arguments);
-    }
-};
-
-
-// LayerMultiplex
-cc.LayerMultiplex.create = cc.LayerMultiplex.createWithArray;
-
-/**
- * Creates an animation.
- * @param {Array} frames
- * @param {Number} delay
- * @param {Number} [loops=1]
- * @return {cc.Animation}
- * @example
- *
- * 1.Creates an empty animation
- * var animation1 = cc.Animation.create();
- *
- * 2.Create an animation with sprite frames , delay and loops.
- * var spriteFrames = [];
- * var frame = cache.getSpriteFrame('grossini_dance_01.png');
- * spriteFrames.push(frame);
- * var animation1 = cc.Animation.create(spriteFrames);
- * var animation2 = cc.Animation.create(spriteFrames, 0.2);
- * var animation2 = cc.Animation.create(spriteFrames, 0.2, 2);
- *
- * 3.Create an animation with animation frames , delay and loops.
- * var animationFrames = [];
- * var frame =  new cc.AnimationFrame();
- * animationFrames.push(frame);
- * var animation1 = cc.Animation.create(animationFrames);
- * var animation2 = cc.Animation.create(animationFrames, 0.2);
- * var animation3 = cc.Animation.create(animationFrames, 0.2, 2);
- */
-cc.Animation.create = function (frames, delay, loops) {
-    if(frames === undefined){
-        return cc.Animation.createWithAnimationFrames();
-    }
-    else if(frames[0] && frames[0] instanceof cc.AnimationFrame){
-        return cc.Animation.createWithAnimationFrames.apply(this, arguments);
-    }
-    else if(frames[0] && frames[0] instanceof cc.SpriteFrame){
-        delay = delay || 0;
-        return cc.Animation.createWithSpriteFrames.apply(this, arguments);
-    }
-};
-
-cc.Menu.create = function(menuItems) {
-    if((arguments.length > 0) && (arguments[arguments.length-1] == null))
-        cc.log('parameters should not be ending with null in Javascript');
-
-    var argc = arguments.length,
-        items = [];
-    if (argc == 1) {
-        if (menuItems instanceof Array) {
-            items = menuItems;
-        }
-        else{
-            items.push(arguments[0]);
-        }
-    }
-    else if (argc > 1) {
-        for (var i = 0; i < argc; i++) {
-            if (arguments[i])
-                items.push(arguments[i]);
-        }
-    }
-    return cc.Menu._create.apply(null, items);
-};
-
-cc.TMXLayer.prototype.tileFlagsAt = cc.TMXLayer.prototype.getTileFlagsAt;
-
-sys.localStorage._setItem = sys.localStorage.setItem;
-sys.localStorage.setItem = function(itemKey,itemValue) {
-    if (typeof itemKey === 'string') {
-        if(itemValue !== undefined && itemValue !== null)
-        {
-            if (typeof itemValue !== 'string') {
-                cc.log("sys.localStorage.setItem Warning: itemValue[" + itemValue + "] is not string!");
-                itemValue = '' + itemValue;
-            }
-            sys.localStorage._setItem(itemKey, itemValue);
-        }
-    }
-    else
-        cc.log("sys.localStorage.setItem Warning: itemKey[" + itemKey + "] is not string!");
-}
-

@@ -29,7 +29,7 @@ THE SOFTWARE.
 #include "2d/CCTMXXMLParser.h"
 #include <unordered_map>
 #include <sstream>
-#include "2d/CCFastTMXTiledMap.h"
+#include "2d/CCTMXTiledMap.h"
 #include "base/ZipUtils.h"
 #include "base/base64.h"
 #include "base/CCDirector.h"
@@ -67,6 +67,14 @@ void TMXLayerInfo::setProperties(ValueMap var)
     _properties = var;
 }
 
+TMXObjectGroupInfo::TMXObjectGroupInfo()
+: _groupName("")
+{
+}
+TMXObjectGroupInfo::~TMXObjectGroupInfo()
+{
+    CCLOGINFO("deallocing TMXObjectGroup: %p", this);
+}
 // implementation TMXTilesetInfo
 TMXTilesetInfo::TMXTilesetInfo()
     :_firstGid(0)
@@ -161,7 +169,13 @@ bool TMXMapInfo::initWithTMXFile(const std::string& tmxFile)
 }
 
 TMXMapInfo::TMXMapInfo()
-: _mapSize(Size::ZERO)
+: _orientation(TMXOrientationOrtho)
+, _staggerAxis(TMXStaggerAxis_Y)
+, _staggerIndex(TMXStaggerIndex_Even)
+, _hexSideLength(0)
+, _parentElement(0)
+, _parentGID(0)
+, _mapSize(Size::ZERO)
 , _tileSize(Size::ZERO)
 , _layerAttribs(0)
 , _storingCharacters(false)
@@ -233,21 +247,37 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
         }
         std::string orientationStr = attributeDict["orientation"].asString();
         if (orientationStr == "orthogonal") {
-            tmxMapInfo->setOrientation(0);
+            tmxMapInfo->setOrientation(TMXOrientationOrtho);
         }
         else if (orientationStr  == "isometric") {
-            tmxMapInfo->setOrientation(2);
+            tmxMapInfo->setOrientation(TMXOrientationIso);
         }
         else if (orientationStr == "hexagonal") {
-            tmxMapInfo->setOrientation(1);
+            tmxMapInfo->setOrientation(TMXOrientationHex);
         }
         else if (orientationStr == "staggered") {
-            tmxMapInfo->setOrientation(3);
+            tmxMapInfo->setOrientation(TMXOrientationStaggered);
         }
         else {
             CCLOG("cocos2d: TMXFomat: Unsupported orientation: %d", tmxMapInfo->getOrientation());
         }
+        std::string staggerAxisStr = attributeDict["staggeraxis"].asString();
+        if (staggerAxisStr == "x") {
+            tmxMapInfo->setStaggerAxis(TMXStaggerAxis_X);
+        }
+        else if (staggerAxisStr  == "y") {
+            tmxMapInfo->setStaggerAxis(TMXStaggerAxis_Y);
+        }
 
+        std::string staggerIndex = attributeDict["staggerindex"].asString();
+        if (staggerIndex == "odd") {
+            tmxMapInfo->setStaggerIndex(TMXStaggerIndex_Odd);
+        }
+        else if (staggerIndex == "even") {
+            tmxMapInfo->setStaggerIndex(TMXStaggerIndex_Even);
+        }
+        float hexSideLength = attributeDict["hexsidelength"].asFloat();
+        tmxMapInfo->setHexSideLength(hexSideLength);
         Size s;
         s.width = attributeDict["width"].asFloat();
         s.height = attributeDict["height"].asFloat();
@@ -266,6 +296,7 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
         std::string externalTilesetFilename = attributeDict["source"].asString();
         if (externalTilesetFilename != "")
         {
+            _externalTilesetFilename = externalTilesetFilename;
             // Tileset file will be relative to the map file. So we need to convert it to an absolute path
             if (_TMXFileName.find_last_of("/") != string::npos)
             {
@@ -361,6 +392,7 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
         float y = attributeDict["y"].asFloat();
         layer->_offset.set(x, y);
 
+        tmxMapInfo->getAllChildren().pushBack(layer);
         tmxMapInfo->getLayers().pushBack(layer);
         layer->release();
 
@@ -369,18 +401,58 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
     }
     else if (elementName == "objectgroup")
     {
-        TMXObjectGroup *objectGroup = new (std::nothrow) TMXObjectGroup();
-        objectGroup->setGroupName(attributeDict["name"].asString());
+        TMXObjectGroupInfo *objectGroup = new (std::nothrow) TMXObjectGroupInfo();
+        objectGroup->_groupName = attributeDict["name"].asString();
         Vec2 positionOffset;
-        positionOffset.x = attributeDict["x"].asFloat() * tmxMapInfo->getTileSize().width;
-        positionOffset.y = attributeDict["y"].asFloat() * tmxMapInfo->getTileSize().height;
-        objectGroup->setPositionOffset(positionOffset);
+        positionOffset.x = attributeDict["offsetx"].asFloat();
+        positionOffset.y = attributeDict["offsety"].asFloat();
+        objectGroup->_positionOffset = CC_POINT_PIXELS_TO_POINTS(positionOffset);
+        
+        // object group color
+        Value& colorValue = attributeDict["color"];
+        if (colorValue.isNull()) {
+            objectGroup->_color = Color3B(255, 255, 255);
+        } else {
+            std::string colorStr = colorValue.asString();
+            auto startPos = colorStr.find("#");
+            if (startPos != string::npos) {
+                colorStr.replace(startPos, 1, "");
+            }
+            // Android NDK 10 doesn't support std::stoi a/ std::stoul
+#if CC_TARGET_PLATFORM != CC_PLATFORM_ANDROID
+            int num = std::stoi(colorStr, nullptr, 16);
+#else
+            int num = atoi(colorStr.c_str());
+#endif
+            int r = num / 0x10000;
+            int g = (num / 0x100) % 0x100;
+            int b = num % 0x100;
+            
+            objectGroup->_color = Color3B(r, g, b);
+        }
+        
+        // object group opacity
+        Value& opacityValue = attributeDict["opacity"];
+        float percent = opacityValue.isNull() ? 1.0 : opacityValue.asFloat();
+        objectGroup->_opacity = 255 * percent;
+        
+        // object group visible
+        Value& visibleValue = attributeDict["visible"];
+        objectGroup->_visible = visibleValue.isNull() ? true : visibleValue.asBool();
 
+        tmxMapInfo->getAllChildren().pushBack(objectGroup);
         tmxMapInfo->getObjectGroups().pushBack(objectGroup);
         objectGroup->release();
 
         // The parent element is now "objectgroup"
         tmxMapInfo->setParentElement(TMXPropertyObjectGroup);
+    }
+    else if (elementName == "tileoffset")
+    {
+        TMXTilesetInfo* tileset = tmxMapInfo->getTilesets().back();
+        double tileOffsetX = attributeDict["x"].asDouble();
+        double tileOffsetY = attributeDict["y"].asDouble();
+        tileset->_tileOffset = Vec2(tileOffsetX, tileOffsetY);
     }
     else if (elementName == "image")
     {
@@ -388,6 +460,7 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
 
         // build full path
         std::string imagename = attributeDict["source"].asString();
+        tileset->_originSourceImage = imagename;
 
         if (_TMXFileName.find_last_of("/") != string::npos)
         {
@@ -436,10 +509,16 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
             }
             CCASSERT( compression == "" || compression == "gzip" || compression == "zlib", "TMX: unsupported compression method" );
         }
+        else if (encoding == "csv")
+        {
+            int layerAttribs = tmxMapInfo->getLayerAttribs();
+            tmxMapInfo->setLayerAttribs(layerAttribs | TMXLayerAttribCSV);
+            tmxMapInfo->setStoringCharacters(true);
+        }
     }
     else if (elementName == "object")
     {
-        TMXObjectGroup* objectGroup = tmxMapInfo->getObjectGroups().back();
+        TMXObjectGroupInfo* objectGroup = tmxMapInfo->getObjectGroups().back();
 
         // The value for "type" was blank or not a valid class name
         // Create an instance of TMXObjectInfo to store the object and its properties
@@ -455,24 +534,36 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
 
         // But X and Y since they need special treatment
         // X
-        int x = attributeDict["x"].asInt();
+        int x = attributeDict["x"].asFloat();
         // Y
-        int y = attributeDict["y"].asInt();
+        int y = attributeDict["y"].asFloat();
 
-        Vec2 p(x + objectGroup->getPositionOffset().x, _mapSize.height * _tileSize.height - y  - objectGroup->getPositionOffset().y - attributeDict["height"].asInt());
-        p = CC_POINT_PIXELS_TO_POINTS(p);
-        dict["x"] = Value(p.x);
-        dict["y"] = Value(p.y);
+        dict["x"] = Value(x);
+        dict["y"] = Value(y);
+        
+        int width = attributeDict["width"].asFloat();
+        int height = attributeDict["height"].asFloat();
+        dict["width"] = Value(width);
+        dict["height"] = Value(height);
+        
+        // visible
+        Value& visibleValue = attributeDict["visible"];
+        dict["visible"] = Value(visibleValue.isNull() ? true : visibleValue.asBool());
+        
+        // rotation
+        Value& rotationValue = attributeDict["rotation"];
+        dict["rotation"] = Value(rotationValue.isNull() ? 0.0 : rotationValue.asFloat());
 
-        int width = attributeDict["width"].asInt();
-        int height = attributeDict["height"].asInt();
-        Size s(width, height);
-        s = CC_SIZE_PIXELS_TO_POINTS(s);
-        dict["width"] = Value(s.width);
-        dict["height"] = Value(s.height);
+        // default type is rect
+        dict["type"] = Value(static_cast<int>(TMXObjectType::RECT));
+
+        // if has gid, the type is image
+        if (!dict["gid"].isNull()) {
+            dict["type"] = Value(static_cast<int>(TMXObjectType::IMAGE));
+        }
 
         // Add the object to the objectGroup
-        objectGroup->getObjects().push_back(Value(dict));
+        objectGroup->_objects.push_back(Value(dict));
 
         // The parent element is now "object"
         tmxMapInfo->setParentElement(TMXPropertyObject);
@@ -503,7 +594,7 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
         else if ( tmxMapInfo->getParentElement() == TMXPropertyObjectGroup )
         {
             // The parent element is the last object group
-            TMXObjectGroup* objectGroup = tmxMapInfo->getObjectGroups().back();
+            TMXObjectGroupInfo* objectGroup = tmxMapInfo->getObjectGroups().back();
             Value value = attributeDict["value"];
             std::string key = attributeDict["name"].asString();
             objectGroup->getProperties().insert(std::make_pair(key, value));
@@ -511,8 +602,8 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
         else if ( tmxMapInfo->getParentElement() == TMXPropertyObject )
         {
             // The parent element is the last object
-            TMXObjectGroup* objectGroup = tmxMapInfo->getObjectGroups().back();
-            ValueMap& dict = objectGroup->getObjects().rbegin()->asValueMap();
+            TMXObjectGroupInfo* objectGroup = tmxMapInfo->getObjectGroups().back();
+            ValueMap& dict = objectGroup->_objects.rbegin()->asValueMap();
 
             std::string propertyName = attributeDict["name"].asString();
             dict[propertyName] = attributeDict["value"];
@@ -528,8 +619,9 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
     else if (elementName == "polygon")
     {
         // find parent object's dict and add polygon-points to it
-        TMXObjectGroup* objectGroup = _objectGroups.back();
-        ValueMap& dict = objectGroup->getObjects().rbegin()->asValueMap();
+        TMXObjectGroupInfo* objectGroup = _objectGroups.back();
+        ValueMap& dict = objectGroup->_objects.rbegin()->asValueMap();
+        dict["type"] = Value(static_cast<int>(TMXObjectType::POLYGON));
 
         // get points value string
         std::string value = attributeDict["points"].asString();
@@ -552,15 +644,13 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
                 // set x
                 if (std::getline(pointStream, xStr, ','))
                 {
-                    int x = atoi(xStr.c_str()) + (int)objectGroup->getPositionOffset().x;
-                    pointDict["x"] = Value(x);
+                    pointDict["x"] = Value(atof(xStr.c_str()));
                 }
 
                 // set y
                 if (std::getline(pointStream, yStr, ','))
                 {
-                    int y = atoi(yStr.c_str()) + (int)objectGroup->getPositionOffset().y;
-                    pointDict["y"] = Value(y);
+                    pointDict["y"] = Value(atof(yStr.c_str()));
                 }
 
                 // add to points array
@@ -573,9 +663,9 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
     else if (elementName == "polyline")
     {
         // find parent object's dict and add polyline-points to it
-        TMXObjectGroup* objectGroup = _objectGroups.back();
-        ValueMap& dict = objectGroup->getObjects().rbegin()->asValueMap();
-
+        TMXObjectGroupInfo* objectGroup = _objectGroups.back();
+        ValueMap& dict = objectGroup->_objects.rbegin()->asValueMap();
+        dict["type"] = Value(static_cast<int>(TMXObjectType::POLYLINE));
         // get points value string
         std::string value = attributeDict["points"].asString();
         if (!value.empty())
@@ -597,15 +687,13 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
                 // set x
                 if (std::getline(pointStream, xStr, ','))
                 {
-                    int x = atoi(xStr.c_str()) + (int)objectGroup->getPositionOffset().x;
-                    pointDict["x"] = Value(x);
+                    pointDict["x"] = Value(atof(xStr.c_str()));
                 }
 
                 // set y
                 if (std::getline(pointStream, yStr, ','))
                 {
-                    int y = atoi(yStr.c_str()) + (int)objectGroup->getPositionOffset().y;
-                    pointDict["y"] = Value(y);
+                    pointDict["y"] = Value(atof(yStr.c_str()));
                 }
 
                 // add to points array
@@ -614,6 +702,11 @@ void TMXMapInfo::startElement(void *ctx, const char *name, const char **atts)
 
             dict["polylinePoints"] = Value(pointsArray);
         }
+    }
+    else if (elementName == "ellipse") {
+        TMXObjectGroupInfo* objectGroup = _objectGroups.back();
+        ValueMap& dict = objectGroup->_objects.rbegin()->asValueMap();
+        dict["type"] = Value(static_cast<int>(TMXObjectType::ELLIPSE));
     }
 }
 
@@ -666,6 +759,45 @@ void TMXMapInfo::endElement(void *ctx, const char *name)
                 layer->_tiles = reinterpret_cast<uint32_t*>(buffer);
             }
 
+            tmxMapInfo->setCurrentString("");
+        }
+        else if (tmxMapInfo->getLayerAttribs() & TMXLayerAttribCSV)
+        {
+            unsigned char *buffer;
+            
+            TMXLayerInfo* layer = tmxMapInfo->getLayers().back();
+            
+            tmxMapInfo->setStoringCharacters(false);
+            std::string currentString = tmxMapInfo->getCurrentString();
+            
+            vector<string> gidTokens;
+            istringstream filestr(currentString);
+            string sRow;
+            while(getline(filestr, sRow, '\n')) {
+                string sGID;
+                istringstream rowstr(sRow);
+                while (getline(rowstr, sGID, ',')) {
+                    gidTokens.push_back(sGID);
+                }
+            }
+            
+            // 32-bits per gid
+            buffer = (unsigned char*)malloc(gidTokens.size() * 4);
+            if (!buffer)
+            {
+                CCLOG("cocos2d: TiledMap: CSV buffer not allocated.");
+                return;
+            }
+            
+            uint32_t* bufferPtr = reinterpret_cast<uint32_t*>(buffer);
+            for(auto gidToken : gidTokens) {
+                auto tileGid = (uint32_t)strtol(gidToken.c_str(), nullptr, 10);
+                *bufferPtr = tileGid;
+                bufferPtr++;
+            }
+            
+            layer->_tiles = reinterpret_cast<uint32_t*>(buffer);
+            
             tmxMapInfo->setCurrentString("");
         }
         else if (tmxMapInfo->getLayerAttribs() & TMXLayerAttribNone)

@@ -1,19 +1,33 @@
 #include "AppDelegate.h"
-#include "SimpleAudioEngine.h"
 
-#if (CC_TARGET_PLATFORM != CC_PLATFORM_LINUX)
-#include "ide-support/CodeIDESupport.h"
-#endif
+#include "platform/CCGLView.h"
 
-#if (COCOS2D_DEBUG > 0) && (CC_CODE_IDE_DEBUG_SUPPORT > 0)
-#include "runtime/Runtime.h"
-#include "ide-support/RuntimeJsImpl.h"
-#else
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_IOS)
+#include "platform/ios/CCGLViewImpl-ios.h"
+#endif // CC_TARGET_PLATFORM == CC_PLATFORM_IOS
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
+#include "platform/android/CCGLViewImpl-android.h"
+#endif // CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
+#include "platform/desktop/CCGLViewImpl-desktop.h"
+#endif // CC_TARGET_PLATFORM == CC_PLATFORM_WIN32
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_MAC)
+#include "platform/desktop/CCGLViewImpl-desktop.h"
+#endif // CC_TARGET_PLATFORM == CC_PLATFORM_MAC
+
+#include "base/CCDirector.h"
+#include "base/CCEventDispatcher.h"
+
 #include "js_module_register.h"
+
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID || CC_TARGET_PLATFORM == CC_PLATFORM_IOS) && PACKAGE_AS
+#include "SDKManager.h"
+#include "jsb_anysdk_protocols_auto.hpp"
+#include "manualanysdkbindings.hpp"
+using namespace anysdk::framework;
 #endif
 
 USING_NS_CC;
-using namespace CocosDenshion;
 
 AppDelegate::AppDelegate()
 {
@@ -21,66 +35,55 @@ AppDelegate::AppDelegate()
 
 AppDelegate::~AppDelegate()
 {
-	SimpleAudioEngine::end();
     ScriptEngineManager::destroyInstance();
-    
-#if (COCOS2D_DEBUG > 0) && (CC_CODE_IDE_DEBUG_SUPPORT > 0)
-    // NOTE:Please don't remove this call if you want to debug with Cocos Code IDE
-    RuntimeEngine::getInstance()->end();
+
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID || CC_TARGET_PLATFORM == CC_PLATFORM_IOS) && PACKAGE_AS
+    SDKManager::getInstance()->purge();
 #endif
 }
 
-//if you want a different context,just modify the value of glContextAttrs
-//it will takes effect on all platforms
 void AppDelegate::initGLContextAttrs()
 {
-    //set OpenGL context attributions,now can only set six attributions:
-    //red,green,blue,alpha,depth,stencil
     GLContextAttrs glContextAttrs = {8, 8, 8, 8, 24, 8};
-
+    
     GLView::setGLContextAttrs(glContextAttrs);
 }
 
 bool AppDelegate::applicationDidFinishLaunching()
 {
+#if CC_TARGET_PLATFORM == CC_PLATFORM_IOS && PACKAGE_AS
+    SDKManager::getInstance()->loadAllPlugins();
+#endif
     // initialize director
     auto director = Director::getInstance();
-
+    auto glview = director->getOpenGLView();
+    if(!glview) {
+#if(CC_TARGET_PLATFORM == CC_PLATFORM_WP8) || (CC_TARGET_PLATFORM == CC_PLATFORM_WINRT)
+        glview = GLViewImpl::create("raphael");
+#else
+        glview = GLViewImpl::createWithRect("raphael", Rect(0,0,900,640));
+#endif
+        director->setOpenGLView(glview);
+    }
+    
     // set FPS. the default value is 1.0/60 if you don't call this
     director->setAnimationInterval(1.0 / 60);
-
-#if (COCOS2D_DEBUG > 0) && (CC_CODE_IDE_DEBUG_SUPPORT > 0)
-
-#if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
-    // for getIPAddress
-    extern void setActivityPathForAndroid(const std::string &path);
-    setActivityPathForAndroid("org/cocos2dx/javascript/AppActivity");
-#endif
-
-    auto runtimeEngine = RuntimeEngine::getInstance();
-    auto jsRuntime = RuntimeJsImpl::create();
-    runtimeEngine->addRuntime(jsRuntime, kRuntimeEngineJs);
-    runtimeEngine->start();
     
-    // js need special debug port
-    if (runtimeEngine->getProjectConfig().getDebuggerType() != kCCRuntimeDebuggerNone)
-    {
-        jsRuntime->startWithDebugger();
-    }
-#else
     js_module_register();
     
     ScriptingCore* sc = ScriptingCore::getInstance();
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID || CC_TARGET_PLATFORM == CC_PLATFORM_IOS) && PACKAGE_AS    
+    sc->addRegisterCallback(register_all_anysdk_framework);
+    sc->addRegisterCallback(register_all_anysdk_manual);
+#endif
     sc->start();
     sc->runScript("script/jsb_boot.js");
 #if defined(COCOS2D_DEBUG) && (COCOS2D_DEBUG > 0)
     sc->enableDebugger();
 #endif
-    ScriptEngineProtocol *engine = ScriptingCore::getInstance();
-    ScriptEngineManager::getInstance()->setScriptEngine(engine);
+    ScriptEngineManager::getInstance()->setScriptEngine(sc);
     ScriptingCore::getInstance()->runScript("main.js");
-#endif
-
+    
     return true;
 }
 
@@ -90,8 +93,6 @@ void AppDelegate::applicationDidEnterBackground()
     auto director = Director::getInstance();
     director->stopAnimation();
     director->getEventDispatcher()->dispatchCustomEvent("game_on_hide");
-    SimpleAudioEngine::getInstance()->pauseBackgroundMusic();
-    SimpleAudioEngine::getInstance()->pauseAllEffects();    
 }
 
 // this function will be called when the app is active again
@@ -100,7 +101,4 @@ void AppDelegate::applicationWillEnterForeground()
     auto director = Director::getInstance();
     director->startAnimation();
     director->getEventDispatcher()->dispatchCustomEvent("game_on_show");
-    SimpleAudioEngine::getInstance()->resumeBackgroundMusic();
-    SimpleAudioEngine::getInstance()->resumeAllEffects();
 }
-

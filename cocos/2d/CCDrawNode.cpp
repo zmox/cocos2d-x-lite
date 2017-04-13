@@ -304,21 +304,21 @@ void DrawNode::draw(Renderer *renderer, const Mat4 &transform, uint32_t flags)
 {
     if(_bufferCount)
     {
-        _customCommand.init(_globalZOrder);
+        _customCommand.init(_globalZOrder, transform, flags);
         _customCommand.func = CC_CALLBACK_0(DrawNode::onDraw, this, transform, flags);
         renderer->addCommand(&_customCommand);
     }
 
     if(_bufferCountGLPoint)
     {
-        _customCommandGLPoint.init(_globalZOrder);
+        _customCommandGLPoint.init(_globalZOrder, transform, flags);
         _customCommandGLPoint.func = CC_CALLBACK_0(DrawNode::onDrawGLPoint, this, transform, flags);
         renderer->addCommand(&_customCommandGLPoint);
     }
 
     if(_bufferCountGLLine)
     {
-        _customCommandGLLine.init(_globalZOrder);
+        _customCommandGLLine.init(_globalZOrder, transform, flags);
         _customCommandGLLine.func = CC_CALLBACK_0(DrawNode::onDrawGLLine, this, transform, flags);
         renderer->addCommand(&_customCommandGLLine);
     }
@@ -327,6 +327,8 @@ void DrawNode::draw(Renderer *renderer, const Mat4 &transform, uint32_t flags)
 void DrawNode::onDraw(const Mat4 &transform, uint32_t flags)
 {
     getGLProgramState()->apply(transform);
+    auto glProgram = this->getGLProgram();
+    glProgram->setUniformLocationWith1f(glProgram->getUniformLocation("u_alpha"), _displayedOpacity / 255.0);
 
     GL::blendFunc(_blendFunc.src, _blendFunc.dst);
 
@@ -366,11 +368,13 @@ void DrawNode::onDraw(const Mat4 &transform, uint32_t flags)
     CHECK_GL_ERROR_DEBUG();
 }
 
+
 void DrawNode::onDrawGLLine(const Mat4 &transform, uint32_t flags)
 {
     auto glProgram = GLProgramCache::getInstance()->getGLProgram(GLProgram::SHADER_NAME_POSITION_LENGTH_TEXTURE_COLOR);
     glProgram->use();
     glProgram->setUniformsForBuiltins(transform);
+    glProgram->setUniformLocationWith1f(glProgram->getUniformLocation("u_alpha"), _displayedOpacity / 255.0);
 
     GL::blendFunc(_blendFunc.src, _blendFunc.dst);
 
@@ -414,6 +418,7 @@ void DrawNode::onDrawGLPoint(const Mat4 &transform, uint32_t flags)
     auto glProgram = GLProgramCache::getInstance()->getGLProgram(GLProgram::SHADER_NAME_POSITION_COLOR_TEXASPOINTSIZE);
     glProgram->use();
     glProgram->setUniformsForBuiltins(transform);
+    glProgram->setUniformLocationWith1f(glProgram->getUniformLocation("u_alpha"), _displayedOpacity / 255.0);
 
     GL::blendFunc(_blendFunc.src, _blendFunc.dst);
 
@@ -769,12 +774,9 @@ void DrawNode::drawSegment(const Vec2 &from, const Vec2 &to, float radius, const
 void DrawNode::drawPolygon(const Vec2 *verts, int count, const Color4F &fillColor, float borderWidth, const Color4F &borderColor)
 {
     CCASSERT(count >= 0, "invalid count value");
-    if (count <= 0) {
-        return;
-    }
-
-    bool outline = (borderColor.a > 0.0 && borderWidth > 0.0);
-
+    
+    bool outline = (borderColor.a > 0.0f && borderWidth > 0.0f);
+    
     auto  triangle_count = outline ? (3*count - 2) : (count - 2);
     auto vertex_count = 3*triangle_count;
     ensureCapacity(vertex_count);
@@ -807,8 +809,8 @@ void DrawNode::drawPolygon(const Vec2 *verts, int count, const Color4F &fillColo
 
             Vec2 n1 = v2fnormalize(v2fperp(v2fsub(v1, v0)));
             Vec2 n2 = v2fnormalize(v2fperp(v2fsub(v2, v1)));
-
-            Vec2 offset = v2fmult(v2fadd(n1, n2), 1.0/(v2fdot(n1, n2) + 1.0));
+            
+            Vec2 offset = v2fmult(v2fadd(n1, n2), 1.0f / (v2fdot(n1, n2) + 1.0f));
             struct ExtrudeVerts tmp = {offset, n2};
             extrude[i] = tmp;
         }

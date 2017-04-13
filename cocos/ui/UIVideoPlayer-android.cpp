@@ -22,14 +22,14 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-#include "UIVideoPlayer.h"
+#include "ui/UIVideoPlayer.h"
 
 #if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
 #include <unordered_map>
 #include <stdlib.h>
 #include <jni.h>
 #include <string>
-#include "jni/JniHelper.h"
+#include "platform/android/jni/JniHelper.h"
 #include "base/CCDirector.h"
 #include "base/CCEventListenerKeyboard.h"
 #include "platform/CCFileUtils.h"
@@ -37,7 +37,7 @@
 
 //-----------------------------------------------------------------------------------------------------------
 
-#define videoHelperClassName "org/cocos2dx/lib/Cocos2dxVideoHelper"
+static const std::string videoHelperClassName = "org/cocos2dx/lib/Cocos2dxVideoHelper";
 
 USING_NS_CC;
 
@@ -55,7 +55,7 @@ int createVideoWidgetJNI()
 {
     JniMethodInfo t;
     int ret = -1;
-    if (JniHelper::getStaticMethodInfo(t, videoHelperClassName, "createVideoWidget", "()I")) {
+    if (JniHelper::getStaticMethodInfo(t, videoHelperClassName.c_str(), "createVideoWidget", "()I")) {
         ret = t.env->CallStaticIntMethod(t.classID, t.methodID);
 
         t.env->DeleteLocalRef(t.classID);
@@ -82,7 +82,7 @@ VideoPlayer::VideoPlayer()
 
 #if CC_VIDEOPLAYER_DEBUG_DRAW
     _debugDrawNode = DrawNode::create();
-    addchild(_debugDrawNode);
+    addChild(_debugDrawNode);
 #endif
 }
 
@@ -164,7 +164,7 @@ void VideoPlayer::setKeepAspectRatioEnabled(bool enable)
 void VideoPlayer::drawDebugData()
 {
     Director* director = Director::getInstance();
-    CCASSERT(nullptr != director, "Director is null when seting matrix stack");
+    CCASSERT(nullptr != director, "Director is null when setting matrix stack");
 
     director->pushMatrix(MATRIX_STACK_TYPE::MATRIX_STACK_MODELVIEW);
     director->loadMatrix(MATRIX_STACK_TYPE::MATRIX_STACK_MODELVIEW, _modelViewTransform);
@@ -227,7 +227,7 @@ void VideoPlayer::seekTo(float sec)
 
 bool VideoPlayer::isPlaying() const
 {
-    return _isPlaying;
+    return JniHelper::callStaticBooleanMethod(videoHelperClassName, "isPlaying", _videoPlayerIndex);
 }
 
 void VideoPlayer::setVisible(bool visible)
@@ -269,13 +269,8 @@ void VideoPlayer::onPlayEvent(int event)
     else
     {
         VideoPlayer::EventType videoEvent = (VideoPlayer::EventType)event;
-        if (videoEvent == VideoPlayer::EventType::PLAYING) {
-            _isPlaying = true;
-        } else {
-            _isPlaying = false;
-        }
 
-        if (_eventCallback)
+        if (_eventCallback && this->isRunning())
         {
             _eventCallback(this,videoEvent);
         }
@@ -292,7 +287,6 @@ void VideoPlayer::copySpecialProperties(Widget *widget)
     VideoPlayer* videoPlayer = dynamic_cast<VideoPlayer*>(widget);
     if (videoPlayer)
     {
-        _isPlaying = videoPlayer->_isPlaying;
         _fullScreenEnabled = videoPlayer->_fullScreenEnabled;
         _fullScreenDirty = videoPlayer->_fullScreenDirty;
         _videoURL = videoPlayer->_videoURL;
@@ -313,5 +307,14 @@ void executeVideoCallback(int index,int event)
     }
 }
 
-#endif
+float VideoPlayer::currentTime() const
+{
+    return JniHelper::callStaticFloatMethod(videoHelperClassName, "getCurrentTime", _videoPlayerIndex);
+}
 
+float VideoPlayer::duration() const
+{
+    return JniHelper::callStaticFloatMethod(videoHelperClassName, "getDuration", _videoPlayerIndex);
+}
+
+#endif

@@ -30,10 +30,12 @@
 #include "2d/CCFontAtlas.h"
 #include "2d/CCFontCharMap.h"
 #include "2d/CCLabel.h"
+#include "2d/CCSpriteFrame.h"
 
 NS_CC_BEGIN
 
 std::unordered_map<std::string, FontAtlas *> FontAtlasCache::_atlasMap;
+#define ATLAS_MAP_KEY_BUFFER 255
 
 void FontAtlasCache::purgeCachedData()
 {
@@ -53,11 +55,13 @@ FontAtlas* FontAtlasCache::getFontAtlasTTF(const _ttfConfig* config)
         useDistanceField = false;
     }
 
-    char tmp[300];
+    char tmp[ATLAS_MAP_KEY_BUFFER];
     if (useDistanceField) {
-        sprintf(tmp, "%s distance field %f %d",config->fontFilePath.c_str(), config->fontSize, config->outlineSize);
+        snprintf(tmp, ATLAS_MAP_KEY_BUFFER, "df %.2f %d %s", config->fontSize, config->outlineSize,
+                 config->fontFilePath.c_str());
     } else {
-        sprintf(tmp, "%s %f %d",config->fontFilePath.c_str(), config->fontSize, config->outlineSize);
+        snprintf(tmp, ATLAS_MAP_KEY_BUFFER, "%.2f %d %s", config->fontSize, config->outlineSize,
+                 config->fontFilePath.c_str());
     }
     std::string atlasName = tmp;
 
@@ -86,16 +90,20 @@ FontAtlas* FontAtlasCache::getFontAtlasTTF(const _ttfConfig* config)
     return nullptr;
 }
 
-FontAtlas* FontAtlasCache::getFontAtlasFNT(const std::string& fontFileName, const Vec2& imageOffset /* = Vec2::ZERO */)
+FontAtlas* FontAtlasCache::getFontAtlasFNT(const std::string& fntDataString,
+                                           SpriteFrame* spriteFrame,
+                                           const Vec2& imageOffset /* = Vec2::ZERO */)
 {
-    char tmp[255];
-    sprintf(tmp, "%s %f %f", fontFileName.c_str(), imageOffset.x, imageOffset.y);
+    auto realFontFilename = spriteFrame->getTexture()->getPath();
+
+    char tmp[ATLAS_MAP_KEY_BUFFER];
+    snprintf(tmp, ATLAS_MAP_KEY_BUFFER, "%.2f %.2f %s", imageOffset.x, imageOffset.y, realFontFilename.c_str());
     std::string atlasName = tmp;
 
     auto it = _atlasMap.find(atlasName);
     if ( it == _atlasMap.end() )
     {
-        auto font = FontFNT::create(fontFileName,imageOffset);
+        auto font = FontFNT::create(fntDataString, spriteFrame, imageOffset);
 
         if(font)
         {
@@ -176,8 +184,8 @@ FontAtlas* FontAtlasCache::getFontAtlasCharMap(Texture2D* texture, int itemWidth
 
 FontAtlas* FontAtlasCache::getFontAtlasCharMap(const std::string& charMapFile, int itemWidth, int itemHeight, int startCharMap)
 {
-    char tmp[255];
-    snprintf(tmp,250,"name:%s_%d_%d_%d",charMapFile.c_str(),itemWidth,itemHeight,startCharMap);
+    char tmp[ATLAS_MAP_KEY_BUFFER];
+    snprintf(tmp, ATLAS_MAP_KEY_BUFFER, "%d %d %d %s", itemWidth, itemHeight, startCharMap, charMapFile.c_str());
     std::string atlasName = tmp;
 
     auto it = _atlasMap.find(atlasName);
@@ -227,5 +235,48 @@ bool FontAtlasCache::releaseFontAtlas(FontAtlas *atlas)
     return false;
 }
 
-NS_CC_END
+void FontAtlasCache::reloadFontAtlasFNT(const std::string& fntDataString,
+                                        SpriteFrame* spriteFrame,
+                                        const Vec2& imageOffset/* = Vec2::ZERO*/)
+{
+    char tmp[ATLAS_MAP_KEY_BUFFER];
+    snprintf(tmp, ATLAS_MAP_KEY_BUFFER, "%.2f %.2f %s", imageOffset.x, imageOffset.y, fntDataString.c_str());
+    std::string atlasName = tmp;
 
+    auto it = _atlasMap.find(atlasName);
+    if (it != _atlasMap.end())
+    {
+        CC_SAFE_RELEASE_NULL(it->second);
+        _atlasMap.erase(it);
+    }
+
+    auto font = FontFNT::create(fntDataString,
+                                spriteFrame,
+                                imageOffset);
+    if (font)
+    {
+        auto tempAtlas = font->createFontAtlas();
+        if (tempAtlas)
+        {
+            _atlasMap[atlasName] = tempAtlas;
+        }
+    }
+
+}
+
+void FontAtlasCache::unloadFontAtlasTTF(const std::string& fontFileName)
+{
+    auto item = _atlasMap.begin();
+    while (item != _atlasMap.end())
+    {
+        if (item->first.find(fontFileName) != std::string::npos)
+        {
+            CC_SAFE_RELEASE_NULL(item->second);
+            item = _atlasMap.erase(item);
+        }
+        else
+            item++;
+    }
+}
+
+NS_CC_END

@@ -28,18 +28,21 @@
 
 /// @cond DO_NOT_SHOW
 
-#include "CCFont.h"
+#include "2d/CCFont.h"
 
 NS_CC_BEGIN
 
 class BMFontConfiguration;
+class SpriteFrame;
 
 class CC_DLL FontFNT : public Font
 {
 
 public:
 
-    static FontFNT * create(const std::string& fntFilePath, const Vec2& imageOffset = Vec2::ZERO);
+    static FontFNT * create(const std::string& fntDataString,
+                            SpriteFrame* spriteFrame,
+                            const Vec2& imageOffset = Vec2::ZERO);
     /** Purges the cached data.
     Removes from memory the cached configurations and the atlas name dictionary.
     */
@@ -48,7 +51,6 @@ public:
     virtual FontAtlas *createFontAtlas() override;
     void setFontSize(float fontSize);
     int getOriginalFontSize()const;
-
 protected:
 
     FontFNT(BMFontConfiguration *theContfig, const Vec2& imageOffset = Vec2::ZERO);
@@ -73,4 +75,3 @@ private:
 NS_CC_END
 
 #endif /* defined(__cocos2d_libs__CCFontFNT__) */
-

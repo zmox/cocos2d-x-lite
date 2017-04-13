@@ -24,8 +24,8 @@
 #ifndef __jsb_cocos2dx_spine_manual__
 #define __jsb_cocos2dx_spine_manual__
 
-#include "spidermonkey/jsapi.h"
-#include "spine/spine-cocos2dx.h"
+#include "jsapi.h"
+#include "editor-support/spine/spine-cocos2dx.h"
 
 void register_all_cocos2dx_spine_manual(JSContext* cx, JS::HandleObject global);
 
@@ -35,6 +35,9 @@ extern jsval spbonedata_to_jsval(JSContext* cx, const spBoneData* v);
 extern jsval spbone_to_jsval(JSContext* cx, spBone& v);
 extern jsval spskeleton_to_jsval(JSContext* cx, spSkeleton& v);
 extern jsval spattachment_to_jsval(JSContext* cx, spAttachment& v);
+extern jsval spregionattachment_to_jsval(JSContext* cx, spRegionAttachment& v);
+extern jsval spmeshattachment_to_jsval(JSContext* cx, spMeshAttachment& v);
+extern jsval spboundingboxattachment_to_jsval(JSContext* cx, spBoundingBoxAttachment& v);
 extern jsval spslotdata_to_jsval(JSContext* cx, spSlotData& v);
 extern jsval spslot_to_jsval(JSContext* cx, spSlot& v);
 extern jsval sptimeline_to_jsval(JSContext* cx, spTimeline& v);
@@ -43,4 +46,3 @@ extern jsval spanimation_to_jsval(JSContext* cx, spAnimation& v);
 extern jsval sptrackentry_to_jsval(JSContext* cx, spTrackEntry& v);
 
 #endif /* defined(__jsb_cocos2dx_spine_manual__) */
-

@@ -380,7 +380,7 @@ int SimulatorWin::run()
     std::stringstream title;
     title << "Cocos Simulator (" << _project.getFrameScale() * 100 << "%)";
     initGLContextAttrs();
-    auto glview = GLViewImpl::createWithRect(title.str(), frameRect, frameScale);
+    auto glview = GLViewImpl::createWithRect(title.str(), frameRect, frameScale, true);
     _hwnd = glview->getWin32Window();
     player::PlayerWin::createWithHwnd(_hwnd);
     DragAcceptFiles(_hwnd, TRUE);
@@ -462,6 +462,11 @@ void SimulatorWin::setupUI()
             menuItem->setChecked(true);
         }
     }
+
+    // show FPs
+    bool displayStats = cocos2d::Director::getInstance()->isDisplayStats();
+    string fpsItemName = displayStats ? tr("Hide FPS") : tr("Show FPS");
+    menuBar->addItem("FPS_MENU", fpsItemName);
 
     // About
     menuBar->addItem("HELP_MENU", tr("Help"));
@@ -640,6 +645,12 @@ void SimulatorWin::setupUI()
                         else if (data == "ABOUT_MENUITEM")
                         {
                             onHelpAbout();
+                        }
+                        else if (data == "FPS_MENU")
+                        {
+                           auto director = cocos2d::Director::getInstance();
+                           director->setDisplayStats(director->isDisplayStats() == false);
+                           menuItem->setTitle(director->isDisplayStats() ? tr("Hide FPS") : tr("Show FPS"));
                         }
                     }
                 }

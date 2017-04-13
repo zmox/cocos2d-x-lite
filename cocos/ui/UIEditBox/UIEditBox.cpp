@@ -36,7 +36,7 @@ EditBox::EditBox()
 : _editBoxImpl(nullptr)
 , _delegate(nullptr)
 , _editBoxInputMode(EditBox::InputMode::SINGLE_LINE)
-, _editBoxInputFlag(EditBox::InputFlag::INITIAL_CAPS_ALL_CHARACTERS)
+, _editBoxInputFlag(EditBox::InputFlag::LOWERCASE_ALL_CHARACTERS)
 , _keyboardReturnType(KeyboardReturnType::DEFAULT)
 , _backgroundSprite(nullptr)
 , _fontSize(-1)
@@ -509,6 +509,11 @@ void EditBox::keyboardDidHide(IMEKeyboardNotificationInfo& info)
 
 }
 
+ui::Scale9Sprite* EditBox::getBackgroundSprite() const
+{
+    return _backgroundSprite;
+}
+
 #if CC_ENABLE_SCRIPT_BINDING
 void EditBox::registerScriptEditBoxHandler(int handler)
 {
@@ -518,9 +523,9 @@ void EditBox::registerScriptEditBoxHandler(int handler)
 
 void EditBox::unregisterScriptEditBoxHandler()
 {
-    if (0 != _scriptEditBoxHandler && ScriptEngineManager::ShareInstance)
+    if (0 != _scriptEditBoxHandler)
     {
-        ScriptEngineManager::ShareInstance->getScriptEngine()->removeScriptHandler(_scriptEditBoxHandler);
+        ScriptEngineManager::getInstance()->getScriptEngine()->removeScriptHandler(_scriptEditBoxHandler);
         _scriptEditBoxHandler = 0;
     }
 }
@@ -529,4 +534,3 @@ void EditBox::unregisterScriptEditBoxHandler()
 }
 
 NS_CC_END
-

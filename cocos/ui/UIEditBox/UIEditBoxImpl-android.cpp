@@ -36,6 +36,7 @@
 #include "math/Vec2.h"
 #include "ui/UIHelper.h"
 #include "base/CCDirector.h"
+#include "platform/CCFileUtils.h"
 
 NS_CC_BEGIN
 
@@ -47,19 +48,24 @@ namespace ui {
 static void editBoxEditingDidBegin(int index);
 static void editBoxEditingDidChanged(int index, const std::string& text);
 static void editBoxEditingDidEnd(int index, const std::string& text);
+static void editBoxEditingReturn(int index);
 extern "C"{
     JNIEXPORT void JNICALL Java_org_cocos2dx_lib_Cocos2dxEditBoxHelper_editBoxEditingDidBegin(JNIEnv *env, jclass, jint index) {
         editBoxEditingDidBegin(index);
     }
 
     JNIEXPORT void JNICALL Java_org_cocos2dx_lib_Cocos2dxEditBoxHelper_editBoxEditingChanged(JNIEnv *env, jclass, jint index, jstring text) {
-        std::string textString = cocos2d::JniHelper::getStringUTFCharsJNI(env,text);
+        std::string textString = StringUtils::getStringUTFCharsJNI(env,text);
         editBoxEditingDidChanged(index, textString);
     }
 
     JNIEXPORT void JNICALL Java_org_cocos2dx_lib_Cocos2dxEditBoxHelper_editBoxEditingDidEnd(JNIEnv *env, jclass, jint index, jstring text) {
-        std::string textString = cocos2d::JniHelper::getStringUTFCharsJNI(env,text);
+        std::string textString = StringUtils::getStringUTFCharsJNI(env,text);
         editBoxEditingDidEnd(index, textString);
+    }
+
+    JNIEXPORT void JNICALL Java_org_cocos2dx_lib_Cocos2dxEditBoxHelper_editBoxEditingReturn(JNIEnv *env, jclass, jint index) {
+        editBoxEditingReturn(index);
     }
 }
 
@@ -112,8 +118,18 @@ void EditBoxImplAndroid::setNativeFont(const char* pFontName, int fontSize)
 {
     auto director = cocos2d::Director::getInstance();
     auto glView = director->getOpenGLView();
+    auto isFontFileExists = cocos2d::FileUtils::getInstance()->isFileExist(pFontName);
+    std::string realFontPath = pFontName;
+    if (isFontFileExists)
+    {
+        realFontPath = cocos2d::FileUtils::getInstance()->fullPathForFilename(pFontName);
+        if (realFontPath.find("assets/") == 0)
+        {
+            realFontPath = realFontPath.substr(strlen("assets/"));
+        }
+    }
     JniHelper::callStaticVoidMethod(editBoxClassName, "setFont",
-                                    _editBoxIndex, pFontName,
+                                    _editBoxIndex, realFontPath,
                                     (float)fontSize * glView->getScaleX());
 }
 
@@ -174,11 +190,8 @@ void EditBoxImplAndroid::setNativePlaceHolder(const char* pText)
 }
 
 void EditBoxImplAndroid::setNativeVisible(bool visible)
-{
-    if (!visible)
-    {
-        nativeCloseKeyboard();
-    }
+{ // don't need to be implemented on android platform.
+    JniHelper::callStaticVoidMethod(editBoxClassName, "setVisible", _editBoxIndex, visible);
 }
 
 void EditBoxImplAndroid::updateNativeFrame(const Rect& rect)
@@ -191,7 +204,7 @@ void EditBoxImplAndroid::updateNativeFrame(const Rect& rect)
 void EditBoxImplAndroid::nativeOpenKeyboard()
 {
     //it will also open up the soft keyboard
-    JniHelper::callStaticVoidMethod(editBoxClassName, "setVisible", _editBoxIndex, true);
+    JniHelper::callStaticVoidMethod(editBoxClassName, "openKeyboard", _editBoxIndex);
 }
 
 
@@ -227,9 +240,18 @@ void editBoxEditingDidEnd(int index, const std::string& text)
     }
 }
 
+void editBoxEditingReturn(int index)
+{
+    auto it = s_allEditBoxes.find(index);
+    if (it != s_allEditBoxes.end())
+    {
+        s_allEditBoxes[index]->editBoxEditingReturn();
+    }
+}
+
 const char* EditBoxImplAndroid::getNativeDefaultFontName()
 {
-    return "";
+    return "sans-serif";
 }
 
 } //end of ui namespace

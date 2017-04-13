@@ -21,13 +21,13 @@
  * THE SOFTWARE.
  */
 
-#include "js_bindings_config.h"
+#include "scripting/js-bindings/manual/js_bindings_config.h"
 #ifdef JSB_INCLUDE_OPENGL
 
-#include "jsb_opengl_manual.h"
-#include "js_manual_conversions.h"
-#include "js_bindings_core.h"
-#include "jsb_opengl_functions.h"
+#include "scripting/js-bindings/manual/jsb_opengl_manual.h"
+#include "scripting/js-bindings/manual/js_manual_conversions.h"
+#include "scripting/js-bindings/manual/js_bindings_core.h"
+#include "scripting/js-bindings/manual/jsb_opengl_functions.h"
 #include "platform/CCGL.h"
 
 // Helper functions that link "glGenXXXs" (OpenGL ES 2.0 spec), with "gl.createXXX" (WebGL spec)
@@ -518,8 +518,8 @@ bool JSB_glGetUniformfv(JSContext *cx, uint32_t argc, jsval *vp)
     JSObject *typedArray = NULL;
     if( utype == GL_FLOAT) {
         // FIXME: glew on windows will cause array overflow after invoking glGetUniformfv.
-        // It seems that glGetUniformfv re-assign the memeroy with a wrong size which is 4x than we pass in.
-        // For temporary solution, we allocate 4x array.
+        // It seems that glGetUniformfv re-assign the memory with a wrong size which is 4x than we pass in.
+        // For temporary solution, we allocate 4x array. 
         GLfloat* param = new (std::nothrow) GLfloat[usize*4];
         glGetUniformfv(arg0, arg1, param);
 
@@ -529,8 +529,8 @@ bool JSB_glGetUniformfv(JSContext *cx, uint32_t argc, jsval *vp)
         CC_SAFE_DELETE_ARRAY(param);
     } else if( utype == GL_INT ) {
         // FIXME: glew on windows will cause array overflow after invoking glGetUniformfv.
-        // It seems that glGetUniformfv re-assign the memeroy with a wrong size which is 4x than we pass in.
-        // For temporary solution, we allocate 4x array.
+        // It seems that glGetUniformfv re-assign the memory with a wrong size which is 4x than we pass in.
+        // For temporary solution, we allocate 4x array. 
         GLint* param = new (std::nothrow) GLint[usize*4];
         glGetUniformiv(arg0, arg1, param);
 
@@ -546,4 +546,3 @@ bool JSB_glGetUniformfv(JSContext *cx, uint32_t argc, jsval *vp)
 
 
 #endif // JSB_INCLUDE_OPENGL
-

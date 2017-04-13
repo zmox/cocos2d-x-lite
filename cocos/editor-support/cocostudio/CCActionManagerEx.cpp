@@ -22,8 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ****************************************************************************/
 
-#include "cocostudio/CCActionManagerEx.h"
-#include "cocostudio/CocoLoader.h"
+#include "editor-support/cocostudio/CCActionManagerEx.h"
+#include "editor-support/cocostudio/CocoLoader.h"
 
 using namespace cocos2d;
 
@@ -62,6 +62,7 @@ void ActionManagerEx::initWithDictionary(const char* jsonName,const rapidjson::V
 {
     _studioVersionNumber = version;
     std::string path = jsonName;
+    this->_studioVersionNumber = version;
     ssize_t pos = path.find_last_of("/");
     std::string fileName = path.substr(pos+1,path.length());
     cocos2d::Vector<ActionObject*> actionList;
@@ -185,8 +186,13 @@ void ActionManagerEx::releaseActions()
 
 int ActionManagerEx::getStudioVersionNumber() const
 {
+<<<<<<< HEAD
     return _studioVersionNumber;
 }
     
+=======
+    return this->_studioVersionNumber;
+>>>>>>> upstream/v1.4
 }
 
+}

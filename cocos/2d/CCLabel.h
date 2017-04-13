@@ -81,10 +81,18 @@ typedef struct _ttfConfig
     }
 } TTFConfig;
 
+enum class TextFormatter : char
+{
+    NewLine = '\n',
+    CarriageReturn = '\r',
+    NextCharNoChangeX = '\b'
+};
+
 class Sprite;
 class SpriteBatchNode;
 class DrawNode;
 class EventListenerCustom;
+class SpriteFrame;
 
 /**
  * @brief Label is a subclass of Node that knows how to render text labels.
@@ -146,9 +154,12 @@ public:
      *
      * @return An automatically released Label object.
      */
-    static Label* createWithSystemFont(const std::string& text, const std::string& font, float fontSize,
-        const Size& dimensions = Size::ZERO, TextHAlignment hAlignment = TextHAlignment::LEFT,
-        TextVAlignment vAlignment = TextVAlignment::TOP);
+    static Label* createWithSystemFont(const std::string& text,
+                                       const std::string& font,
+                                       float fontSize,
+                                       const Size& dimensions = Size::ZERO,
+                                       TextHAlignment hAlignment = TextHAlignment::LEFT,
+                                       TextVAlignment vAlignment = TextVAlignment::TOP);
 
     /**
     * Allocates and initializes a Label, base on FreeType2.
@@ -162,9 +173,12 @@ public:
     *
     * @return An automatically released Label object.
     */
-    static Label * createWithTTF(const std::string& text, const std::string& fontFilePath, float fontSize,
-        const Size& dimensions = Size::ZERO, TextHAlignment hAlignment = TextHAlignment::LEFT,
-        TextVAlignment vAlignment = TextVAlignment::TOP);
+    static Label * createWithTTF(const std::string& text,
+                                 const std::string& fontFilePath,
+                                 float fontSize,
+                                 const Size& dimensions = Size::ZERO,
+                                 TextHAlignment hAlignment = TextHAlignment::LEFT,
+                                 TextVAlignment vAlignment = TextVAlignment::TOP);
 
     /**
     * Allocates and initializes a Label, base on FreeType2.
@@ -177,13 +191,15 @@ public:
     * @return An automatically released Label object.
     * @see TTFConfig setTTFConfig setMaxLineWidth
     */
-    static Label* createWithTTF(const TTFConfig& ttfConfig, const std::string& text,
-        TextHAlignment hAlignment = TextHAlignment::LEFT, int maxLineWidth = 0);
+    static Label* createWithTTF(const TTFConfig& ttfConfig,
+                                const std::string& text,
+                                TextHAlignment hAlignment = TextHAlignment::LEFT,
+                                int maxLineWidth = 0);
 
     /**
     * Allocates and initializes a Label, with a bitmap font file.
     *
-    * @param bmfontPath A bitmap font file, it's a FNT format.
+    * @param bmfontString A bitmap font string content
     * @param text The initial text.
     * @param hAlignment Text horizontal alignment.
     * @param maxLineWidth The max line width.
@@ -192,9 +208,13 @@ public:
     * @return An automatically released Label object.
     * @see setBMFontFilePath setMaxLineWidth
     */
-    static Label* createWithBMFont(const std::string& bmfontPath, const std::string& text,
-        const TextHAlignment& hAlignment = TextHAlignment::LEFT, int maxLineWidth = 0,
-        const Vec2& imageOffset = Vec2::ZERO);
+    static Label* createWithBMFont(const std::string& bmfontString,
+                                   const std::string& text,
+                                   SpriteFrame* spriteFrame,
+                                   const TextHAlignment& hAlignment = TextHAlignment::LEFT,
+                                   int maxLineWidth = 0,
+                                   const Vec2& imageOffset = Vec2::ZERO);
+    
 
     /**
     * Allocates and initializes a Label, with char map configuration.
@@ -206,7 +226,10 @@ public:
     *
     * @return An automatically released Label object.
     */
-    static Label * createWithCharMap(const std::string& charMapFile, int itemWidth, int itemHeight, int startCharMap);
+    static Label * createWithCharMap(const std::string& charMapFile,
+                                     int itemWidth,
+                                     int itemHeight,
+                                     int startCharMap);
 
     /**
     * Allocates and initializes a Label, with char map configuration.
@@ -218,7 +241,10 @@ public:
     *
     * @return An automatically released Label object.
     */
-    static Label * createWithCharMap(Texture2D* texture, int itemWidth, int itemHeight, int startCharMap);
+    static Label * createWithCharMap(Texture2D* texture,
+                                     int itemWidth,
+                                     int itemHeight,
+                                     int startCharMap);
 
     /**
     * Allocates and initializes a Label, with char map configuration.
@@ -248,7 +274,10 @@ public:
     virtual const TTFConfig& getTTFConfig() const { return _fontConfig;}
 
     /** Sets a new bitmap font to Label */
-    virtual bool setBMFontFilePath(const std::string& bmfontFilePath, const Vec2& imageOffset = Vec2::ZERO, float fontSize = 0);
+    virtual bool setBMFontFilePath(const std::string& bmfontDataString,
+                                   SpriteFrame* spriteFrame,
+                                   const Vec2& imageOffset = Vec2::ZERO,
+                                   float fontSize = 0);
 
     /** Returns the bitmap font used by the Label.*/
     const std::string& getBMFontFilePath() const { return _bmFontPath;}
@@ -364,7 +393,7 @@ public:
     /**
      * Enables strikethrough.
      * Underline and Strikethrough cannot be enabled at the same time.
-     * Strikethough is like an underline but at the middle of the glyph
+     * Strikethrough is like an underline but at the middle of the glyph
      */
     void enableStrikethrough();
     /**
@@ -635,8 +664,8 @@ protected:
 
     bool multilineTextWrapByChar();
     bool multilineTextWrapByWord();
-    bool multilineTextWrap(std::function<int(const std::u16string&, int, int)> lambda);
-    void shrinkLabelToContentSize(std::function<bool(void)> lambda);
+    bool multilineTextWrap(const std::function<int(const std::u16string&, int, int)>& lambda);
+    void shrinkLabelToContentSize(const std::function<bool(void)>& lambda);
     bool isHorizontalClamp();
     bool isVerticalClamp();
     float getRenderingFontSize()const;
@@ -663,6 +692,8 @@ protected:
     bool isHorizontalClamped(float letterPositionX, int lineInex);
     void restoreFontSize();
     void updateLetterSpriteScale(Sprite* sprite);
+    int getFirstCharLen(const std::u16string& utf16Text, int startIndex, int textLen);
+    int getFirstWordLen(const std::u16string& utf16Text, int startIndex, int textLen);
 
     void reset();
 
@@ -760,8 +791,10 @@ protected:
     float _bmfontScale;
     Overflow _overflow;
     float _originalFontSize;
+    SpriteFrame* _fntSpriteFrame;
 
     bool _boldEnabled;
+    bool _italicsEnabled;
     DrawNode* _underlineNode;
     bool _strikethroughEnabled;
 private:
@@ -774,4 +807,3 @@ private:
 NS_CC_END
 
 #endif /*__COCOS2D_CCLABEL_H */
-

@@ -1,18 +1,17 @@
 /******************************************************************************
- * Spine Runtimes Software License
- * Version 2.3
+ * Spine Runtimes Software License v2.5
  *
- * Copyright (c) 2013-2015, Esoteric Software
+ * Copyright (c) 2013-2016, Esoteric Software
  * All rights reserved.
  *
- * You are granted a perpetual, non-exclusive, non-sublicensable and
- * non-transferable license to use, install, execute and perform the Spine
- * Runtimes Software (the "Software") and derivative works solely for personal
- * or internal use. Without the written permission of Esoteric Software (see
- * Section 2 of the Spine Software License Agreement), you may not (a) modify,
- * translate, adapt or otherwise create derivative works, improvements of the
- * Software or develop new applications using the Software or (b) remove,
- * delete, alter or obscure any trademarks or any copyright, trademark, patent
+ * You are granted a perpetual, non-exclusive, non-sublicensable, and
+ * non-transferable license to use, install, execute, and perform the Spine
+ * Runtimes software and derivative works solely for personal or internal
+ * use. Without the written permission of Esoteric Software (see Section 2 of
+ * the Spine Software License Agreement), you may not (a) modify, translate,
+ * adapt, or develop new applications using the Spine Runtimes or otherwise
+ * create derivative works or improvements of the Spine Runtimes or (b) remove,
+ * delete, alter, or obscure any trademarks or any copyright, trademark, patent,
  * or other intellectual property or proprietary rights notices on or in the
  * Software, including any copy thereof. Redistributions in binary or source
  * form must include this license and terms.
@@ -22,11 +21,11 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
  * EVENT SHALL ESOTERIC SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
  * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS INTERRUPTION, OR LOSS OF
+ * USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
 #ifndef SPINE_SKELETON_H_
@@ -36,62 +35,76 @@
 #include <spine/Slot.h>
 #include <spine/Skin.h>
 #include <spine/IkConstraint.h>
+#include <spine/TransformConstraint.h>
+#include <spine/PathConstraint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef struct spSkeleton {
-    spSkeletonData* const data;
+	spSkeletonData* const data;
 
-    int bonesCount;
-    spBone** bones;
-    spBone* const root;
+	int bonesCount;
+	spBone** bones;
+	spBone* const root;
 
-    int slotsCount;
-    spSlot** slots;
-    spSlot** drawOrder;
+	int slotsCount;
+	spSlot** slots;
+	spSlot** drawOrder;
 
-    int ikConstraintsCount;
-    spIkConstraint** ikConstraints;
+	int ikConstraintsCount;
+	spIkConstraint** ikConstraints;
 
-    spSkin* const skin;
-    float r, g, b, a;
-    float time;
-    int/*bool*/flipX, flipY;
-    float x, y;
+	int transformConstraintsCount;
+	spTransformConstraint** transformConstraints;
+
+	int pathConstraintsCount;
+	spPathConstraint** pathConstraints;
+
+	spSkin* const skin;
+	float r, g, b, a;
+	float time;
+	int/*bool*/flipX, flipY;
+	float x, y;
 
 #ifdef __cplusplus
-    spSkeleton() :
-        data(0),
-        bonesCount(0),
-        bones(0),
-        root(0),
-        slotsCount(0),
-        slots(0),
-        drawOrder(0),
+	spSkeleton() :
+		data(0),
+		bonesCount(0),
+		bones(0),
+		root(0),
+		slotsCount(0),
+		slots(0),
+		drawOrder(0),
 
-        ikConstraintsCount(0),
-        ikConstraints(0),
+		ikConstraintsCount(0),
+		ikConstraints(0),
 
-        skin(0),
-        r(0), g(0), b(0), a(0),
-        time(0),
-        flipX(0),
-        flipY(0),
-        x(0), y(0) {
-    }
+		transformConstraintsCount(0),
+		transformConstraints(0),
+
+		skin(0),
+		r(0), g(0), b(0), a(0),
+		time(0),
+		flipX(0),
+		flipY(0),
+		x(0), y(0) {
+	}
 #endif
 } spSkeleton;
 
 spSkeleton* spSkeleton_create (spSkeletonData* data);
 void spSkeleton_dispose (spSkeleton* self);
 
-/* Caches information about bones and IK constraints. Must be called if bones or IK constraints are added or removed. */
-void spSkeleton_updateCache (const spSkeleton* self);
+/* Caches information about bones and constraints. Must be called if bones or constraints, or weighted path attachments
+ * are added or removed. */
+void spSkeleton_updateCache (spSkeleton* self);
 void spSkeleton_updateWorldTransform (const spSkeleton* self);
 
+/* Sets the bones, constraints, and slots to their setup pose values. */
 void spSkeleton_setToSetupPose (const spSkeleton* self);
+/* Sets the bones and constraints to their setup pose values. */
 void spSkeleton_setBonesToSetupPose (const spSkeleton* self);
 void spSkeleton_setSlotsToSetupPose (const spSkeleton* self);
 
@@ -123,7 +136,13 @@ spAttachment* spSkeleton_getAttachmentForSlotIndex (const spSkeleton* self, int 
 int spSkeleton_setAttachment (spSkeleton* self, const char* slotName, const char* attachmentName);
 
 /* Returns 0 if the IK constraint was not found. */
-spIkConstraint* spSkeleton_findIkConstraint (const spSkeleton* self, const char* ikConstraintName);
+spIkConstraint* spSkeleton_findIkConstraint (const spSkeleton* self, const char* constraintName);
+
+/* Returns 0 if the transform constraint was not found. */
+spTransformConstraint* spSkeleton_findTransformConstraint (const spSkeleton* self, const char* constraintName);
+
+/* Returns 0 if the path constraint was not found. */
+spPathConstraint* spSkeleton_findPathConstraint (const spSkeleton* self, const char* constraintName);
 
 void spSkeleton_update (spSkeleton* self, float deltaTime);
 
@@ -152,4 +171,3 @@ typedef spSkeleton Skeleton;
 #endif
 
 #endif /* SPINE_SKELETON_H_*/
-

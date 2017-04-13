@@ -5,17 +5,22 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := cocos2d_js_static
 LOCAL_MODULE_FILENAME := libjscocos2d
 
+LOCAL_ARM_MODE := arm
+
 LOCAL_SRC_FILES := ../auto/jsb_cocos2dx_extension_auto.cpp \
                    ../auto/jsb_cocos2dx_experimental_webView_auto.cpp \
                    ../auto/jsb_cocos2dx_experimental_video_auto.cpp \
                    ../auto/jsb_cocos2dx_spine_auto.cpp \
+                   ../auto/jsb_cocos2dx_dragonbones_auto.cpp \
                    ../auto/jsb_cocos2dx_auto.cpp \
                    ../auto/jsb_cocos2dx_audioengine_auto.cpp \
                    ../auto/jsb_cocos2dx_studio_auto.cpp \
                    ../auto/jsb_cocos2dx_builder_auto.cpp \
                    ../auto/jsb_cocos2dx_ui_auto.cpp \
+                   ../auto/jsb_cocos2dx_network_auto.cpp \
                    ../auto/jsb_creator_auto.cpp \
-                   ../manual/js_module_register.cpp \
+                   ../auto/js_bindings_chipmunk_auto_classes.cpp \
+                   ../auto/js_bindings_chipmunk_functions.cpp \
                    ../manual/ScriptingCore.cpp \
                    ../manual/cocos2d_specifics.cpp \
                    ../manual/js_manual_conversions.cpp \
@@ -25,9 +30,12 @@ LOCAL_SRC_FILES := ../auto/jsb_cocos2dx_extension_auto.cpp \
                    ../manual/jsb_opengl_manual.cpp \
                    ../manual/jsb_opengl_registration.cpp \
                    ../manual/jsb_event_dispatcher_manual.cpp \
+                   ../manual/js_module_register.cpp \
                    ../manual/component/CCComponentJS.cpp \
                    ../manual/experimental/jsb_cocos2dx_experimental_video_manual.cpp \
                    ../manual/experimental/jsb_cocos2dx_experimental_webView_manual.cpp \
+                   ../manual/chipmunk/js_bindings_chipmunk_manual.cpp \
+                   ../manual/chipmunk/js_bindings_chipmunk_registration.cpp \
                    ../manual/cocosbuilder/js_bindings_ccbreader.cpp \
                    ../manual/cocostudio/jsb_cocos2dx_studio_conversions.cpp \
                    ../manual/cocostudio/jsb_cocos2dx_studio_manual.cpp \
@@ -37,12 +45,11 @@ LOCAL_SRC_FILES := ../auto/jsb_cocos2dx_extension_auto.cpp \
                    ../manual/network/jsb_socketio.cpp \
                    ../manual/network/jsb_websocket.cpp \
                    ../manual/network/XMLHTTPRequest.cpp \
+                   ../manual/network/js_network_manual.cpp \
                    ../manual/spine/jsb_cocos2dx_spine_manual.cpp \
+                   ../manual/dragonbones/jsb_cocos2dx_dragonbones_manual.cpp \
                    ../manual/ui/jsb_cocos2dx_ui_manual.cpp \
-                   ../manual/chipmunk/js_bindings_chipmunk_auto_classes.cpp \
-                   ../manual/chipmunk/js_bindings_chipmunk_functions.cpp \
-                   ../manual/chipmunk/js_bindings_chipmunk_manual.cpp \
-                   ../manual/chipmunk/js_bindings_chipmunk_registration.cpp
+                   ../manual/platform/android/CCJavascriptJavaBridge.cpp
 
 LOCAL_CFLAGS := -DCOCOS2D_JAVASCRIPT
 
@@ -51,6 +58,7 @@ LOCAL_EXPORT_CFLAGS := -DCOCOS2D_JAVASCRIPT
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../manual \
                     $(LOCAL_PATH)/../manual/cocostudio \
                     $(LOCAL_PATH)/../manual/spine \
+                    $(LOCAL_PATH)/../manual/platform/android \
                     $(LOCAL_PATH)/../auto \
                     $(LOCAL_PATH)/../../../2d \
                     $(LOCAL_PATH)/../../../base \

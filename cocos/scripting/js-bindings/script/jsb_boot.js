@@ -24,726 +24,15 @@
 // cocos2d boot
 //
 
-//+++++++++++++++++++++++++something about async begin+++++++++++++++++++++++++++++++
-/**
- * Async Pool class, a helper of cc.async
- * @param {Object|Array} srcObj
- * @param {Number} limit the limit of parallel number
- * @param {function} iterator
- * @param {function} onEnd
- * @param {object} target
- * @constructor
- */
-cc.AsyncPool = function(srcObj, limit, iterator, onEnd, target){
-    var self = this;
-    self._srcObj = srcObj;
-    self._limit = limit;
-    self._pool = [];
-    self._iterator = iterator;
-    self._iteratorTarget = target;
-    self._onEnd = onEnd;
-    self._onEndTarget = target;
-    self._results = srcObj instanceof Array ? [] : {};
-    self._isErr = false;
-
-    cc.each(srcObj, function(value, index){
-        self._pool.push({index : index, value : value});
-    });
-
-    self.size = self._pool.length;
-    self.finishedSize = 0;
-    self._workingSize = 0;
-
-    self._limit = self._limit || self.size;
-
-    self.onIterator = function(iterator, target){
-        self._iterator = iterator;
-        self._iteratorTarget = target;
-    };
-
-    self.onEnd = function(endCb, endCbTarget){
-        self._onEnd = endCb;
-        self._onEndTarget = endCbTarget;
-    };
-
-    self._handleItem = function(){
-        var self = this;
-        if(self._pool.length == 0)
-            return;                                                         //return directly if the array's length = 0
-        if(self._workingSize >= self._limit)
-            return;                                                         //return directly if the working size great equal limit number
-        var item = self._pool.shift();
-        var value = item.value, index = item.index;
-        self._workingSize++;
-        self._iterator.call(self._iteratorTarget, value, index, function(err){
-            if(self._isErr)
-                return;
-
-            self.finishedSize++;
-            self._workingSize--;
-            if(err) {
-                self._isErr = true;
-                if(self._onEnd)
-                    self._onEnd.call(self._onEndTarget, err);
-                return
-            }
-
-            var arr = Array.prototype.slice.call(arguments, 1);
-            self._results[this.index] = arr[0];
-            if (self.finishedSize === self.size) {
-                if (self._onEnd)
-                    self._onEnd.call(self._onEndTarget, null, self._results);
-                return;
-            }
-            self._handleItem();
-        }.bind(item), self);
-    };
-
-    self.flow = function(){
-        var self = this;
-        if(self._pool.length === 0) {
-            if(self._onEnd)
-                self._onEnd.call(self._onEndTarget, null, []);
-            return;
-        }
-        for(var i = 0; i < self._limit; i++)
-            self._handleItem();
-    }
-};
-
-cc.async = {
-    /**
-     * Do tasks series.
-     * @param {Array|Object} tasks
-     * @param {function} [cb] callback
-     * @param {Object} [target]
-     * @return {cc.AsyncPool}
-     */
-    series : function(tasks, cb, target){
-        var asyncPool = new cc.AsyncPool(tasks, 1, function(func, index, cb1){
-            func.call(target, cb1);
-        }, cb, target);
-        asyncPool.flow();
-        return asyncPool;
-    },
-
-    /**
-     * Do tasks parallel.
-     * @param {Array|Object} tasks
-     * @param {function} cb callback
-     * @param {Object} [target]
-     * @return {cc.AsyncPool}
-     */
-    parallel : function(tasks, cb, target){
-        var asyncPool = new cc.AsyncPool(tasks, 0, function(func, index, cb1){
-            func.call(target, cb1);
-        }, cb, target);
-        asyncPool.flow();
-        return asyncPool;
-    },
-
-    /**
-     * Do tasks waterfall.
-     * @param {Array|Object} tasks
-     * @param {function} cb callback
-     * @param {Object} [target]
-     * @return {cc.AsyncPool}
-     */
-    waterfall : function(tasks, cb, target){
-        var args = [];
-        var asyncPool = new cc.AsyncPool(tasks, 1,
-            function (func, index, cb1) {
-                args.push(function (err) {
-                    args = Array.prototype.slice.call(arguments, 1);
-                    cb1.apply(null, arguments);
-                });
-                func.apply(target, args);
-            }, function (err, results) {
-                if (!cb)
-                    return;
-                if (err)
-                    return cb.call(target, err);
-                cb.call(target, null, results[results.length - 1]);
-            });
-        asyncPool.flow();
-        return asyncPool;
-    },
-
-    /**
-     * Do tasks by iterator.
-     * @param {Array|Object} tasks
-     * @param {function|Object} iterator
-     * @param {function} [callback]
-     * @param {Object} [target]
-     * @return {cc.AsyncPool}
-     */
-    map : function(tasks, iterator, callback, target){
-        var locIterator = iterator;
-        if(typeof(iterator) === "object"){
-            callback = iterator.cb;
-            target = iterator.iteratorTarget;
-            locIterator = iterator.iterator;
-        }
-        var asyncPool = new cc.AsyncPool(tasks, 0, locIterator, callback, target);
-        asyncPool.flow();
-        return asyncPool;
-    },
-
-    /**
-     * Do tasks by iterator limit.
-     * @param {Array|Object} tasks
-     * @param {Number} limit
-     * @param {function} iterator
-     * @param {function} cb callback
-     * @param {Object} [target]
-     */
-    mapLimit : function(tasks, limit, iterator, cb, target){
-        var asyncPool = new cc.AsyncPool(tasks, limit, iterator, cb, target);
-        asyncPool.flow();
-        return asyncPool;
-    }
-};
-//+++++++++++++++++++++++++something about async end+++++++++++++++++++++++++++++++++
-
-//+++++++++++++++++++++++++something about path begin++++++++++++++++++++++++++++++++
-/**
- * @class
- */
-cc.path = /** @lends cc.path# */{
-    normalizeRE: /[^\.\/]+\/\.\.\//,
-
-    /**
-     * Join strings to be a path.
-     * @example
-     cc.path.join("a", "b.png");//-->"a/b.png"
-     cc.path.join("a", "b", "c.png");//-->"a/b/c.png"
-     cc.path.join("a", "b");//-->"a/b"
-     cc.path.join("a", "b", "/");//-->"a/b/"
-     cc.path.join("a", "b/", "/");//-->"a/b/"
-     * @returns {string}
-     */
-    join : function(){
-        var l = arguments.length;
-        var result = "";
-        for (var i = 0; i < l; i++) {
-            result = (result + (result === "" ? "" : "/") + arguments[i]).replace(/(\/|\\\\)$/, "");
-        }
-        return result;
-    },
-    
-    /**
-     * Get the ext name of a path.
-     * @example
-     cc.path.extname("a/b.png");//-->".png"
-     cc.path.extname("a/b.png?a=1&b=2");//-->".png"
-     cc.path.extname("a/b");//-->null
-     cc.path.extname("a/b?a=1&b=2");//-->null
-     * @param {string} pathStr
-     * @returns {*}
-     */
-    extname: function (pathStr) {
-        var temp = /(\.[^\.\/\?\\]*)(\?.*)?$/.exec(pathStr);
-        return temp ? temp[1] : null;
-    },
-
-    /**
-     * Get the main name of a file name
-     * @param {string} fileName
-     * @returns {string}
-     */
-    mainFileName: function(fileName){
-        if(fileName){
-           var idx = fileName.lastIndexOf(".");
-            if(idx !== -1)
-               return fileName.substring(0,idx);
-        }
-        return fileName;
-    },
-    
-    /**
-     * Get the file name of a file path.
-     * @example
-     cc.path.basename("a/b.png");//-->"b.png"
-     cc.path.basename("a/b.png?a=1&b=2");//-->"b.png"
-     cc.path.basename("a/b.png", ".png");//-->"b"
-     cc.path.basename("a/b.png?a=1&b=2", ".png");//-->"b"
-     cc.path.basename("a/b.png", ".txt");//-->"b.png"
-     * @param {string} pathStr
-     * @param {string} [extname]
-     * @returns {*}
-     */
-    basename : function(pathStr, extname){
-        var index = pathStr.indexOf("?");
-        if(index > 0) pathStr = pathStr.substring(0, index);
-        var reg = /(\/|\\\\)([^(\/|\\\\)]+)$/g;
-        var result = reg.exec(pathStr.replace(/(\/|\\\\)$/, ""));
-        if(!result) return null;
-        var baseName = result[2];
-        if (extname && pathStr.substring(pathStr.length - extname.length).toLowerCase() === extname.toLowerCase())
-            return baseName.substring(0, baseName.length - extname.length);
-        return baseName;
-    },
-    
-    /**
-     * Get dirname of a file path.
-     * @example
-     * unix
-     cc.path.driname("a/b/c.png");//-->"a/b"
-     cc.path.driname("a/b/c.png?a=1&b=2");//-->"a/b"
-     cc.path.dirname("a/b/");//-->"a/b"
-     cc.path.dirname("c.png");//-->""
-     * windows
-     cc.path.driname("a\\b\\c.png");//-->"a\b"
-     cc.path.driname("a\\b\\c.png?a=1&b=2");//-->"a\b"
-     * @param {string} pathStr
-     * @returns {*}
-     */
-    dirname: function (pathStr) {
-        return pathStr.replace(/((.*)(\/|\\|\\\\))?(.*?\..*$)?/, '$2');
-    },
-    
-    /**
-     * Change extname of a file path.
-     * @example
-     cc.path.changeExtname("a/b.png", ".plist");//-->"a/b.plist"
-     cc.path.changeExtname("a/b.png?a=1&b=2", ".plist");//-->"a/b.plist?a=1&b=2"
-     * @param {string} pathStr
-     * @param {string} [extname]
-     * @returns {string}
-     */
-    changeExtname : function(pathStr, extname){
-        extname = extname || "";
-        var index = pathStr.indexOf("?");
-        var tempStr = "";
-        if(index > 0) {
-            tempStr = pathStr.substring(index);
-            pathStr = pathStr.substring(0, index);
-        }
-        index = pathStr.lastIndexOf(".");
-        if(index < 0) return pathStr + extname + tempStr;
-        return pathStr.substring(0, index) + extname + tempStr;
-    },
-    /**
-     * Change file name of a file path.
-     * @example
-     cc.path.changeBasename("a/b/c.plist", "b.plist");//-->"a/b/b.plist"
-     cc.path.changeBasename("a/b/c.plist?a=1&b=2", "b.plist");//-->"a/b/b.plist?a=1&b=2"
-     cc.path.changeBasename("a/b/c.plist", ".png");//-->"a/b/c.png"
-     cc.path.changeBasename("a/b/c.plist", "b");//-->"a/b/b"
-     cc.path.changeBasename("a/b/c.plist", "b", true);//-->"a/b/b.plist"
-     * @param {String} pathStr
-     * @param {String} basename
-     * @param {Boolean} [isSameExt]
-     * @returns {string}
-     */
-    changeBasename: function (pathStr, basename, isSameExt) {
-        if (basename.indexOf(".") === 0) return this.changeExtname(pathStr, basename);
-        var index = pathStr.indexOf("?");
-        var tempStr = "";
-        var ext = isSameExt ? this.extname(pathStr) : "";
-        if(index > 0) {
-            tempStr = pathStr.substring(index);
-            pathStr = pathStr.substring(0, index);
-        }
-        index = pathStr.lastIndexOf("/");
-        index = index <= 0 ? 0 : index+1;
-        return pathStr.substring(0, index) + basename + ext + tempStr;
-    },
-    //todo make public after verification
-    _normalize: function(url){
-        var oldUrl = url = String(url);
-
-        //removing all ../
-        do {
-            oldUrl = url;
-            url = url.replace(this.normalizeRE, "");
-        } while(oldUrl.length !== url.length);
-        return url;
-    }
-};
-//+++++++++++++++++++++++++something about path end++++++++++++++++++++++++++++++++
-
-//+++++++++++++++++++++++++something about loader start+++++++++++++++++++++++++++
-cc.loader = {
-    _resPath : "",
-    _audioPath : "",
-    _register : {},//register of loaders
-    cache : {},//cache for data loaded
-    _langPathCache : {},//cache for lang path
-
-    /**
-     * Get XMLHttpRequest.
-     * @returns {XMLHttpRequest}
-     */
-    getXMLHttpRequest : function () {
-        return new XMLHttpRequest();
-    },
+'use strict';
 
 
-    //@MODE_BEGIN DEV
-    
-    _jsCache : {},//cache for js
-    
-    _getArgs4Js : function(args){
-        var a0 = args[0], a1 = args[1], a2 = args[2], results = ["", null, null];
-        
-        if (args.length === 1) {
-            results[1] = a0 instanceof Array ? a0 : [a0];
-        } else if (args.length === 2) {
-            if (typeof a1 === "function") {
-                results[1] = a0 instanceof Array ? a0 : [a0];
-                results[2] = a1;
-            }else{
-                results[0] = a0 || "";
-                results[1] = a1 instanceof Array ? a1 : [a1];
-            }
-        } else if (args.length === 3) {
-            results[0] = a0 || "";
-            results[1] = a1 instanceof Array ? a1 : [a1];
-            results[2] = a2;
-        } else throw new Error("arguments error to load js!");
-        return results;
-    },
-    /**
-     * Load js files.
-     * @param {?string=} baseDir   The pre path for jsList.
-     * @param {array.<string>} jsList    List of js path.
-     * @param {function} cb        Callback function
-     *
-     *      If the arguments.length == 2, then the baseDir turns to be "".
-     * @returns {*}
-     */
-    loadJs : function(baseDir, jsList, cb){
-        var self = this, localJsCache = self._jsCache,
-        args = self._getArgs4Js(arguments);
-        baseDir = args[0];
-        jsList = args[1];
-        cb = args[2];
-        var ccPath = cc.path;
-        for(var i = 0, li = jsList.length; i < li; ++i){
-            require(ccPath.join(baseDir, jsList[i]));
-        }
-        if(cb) cb();
-    },
-    /**
-     * Load js width loading image.
-     *
-     * @param {string} [baseDir]
-     * @param {array} jsList
-     * @param {function} [cb]
-     */
-    loadJsWithImg : function(baseDir, jsList, cb){
-        this.loadJs.apply(this, arguments);
-    },
-
-    //@MODE_END DEV
-
-    /**
-     * Load a single resource as txt.
-     * @param {!string} url
-     * @param {function} cb arguments are : err, txt
-     */
-    loadTxt : function(url, cb){
-        cb(null, jsb.fileUtils.getStringFromFile(url));
-    },
-
-    loadJson : function(url, cb){
-        this.loadTxt(url, function(err, txt){
-            try{
-                err ? cb(err) : cb(null, JSON.parse(txt));
-            }catch(e){
-                throw e;
-                cb("load json [" + url + "] failed : " + e);
-            }
-        });
-    },
-    
-    /**
-     * Load a single image.
-     * @param {!string} url
-     * @param {object} [option]
-     * @param {function} cb
-     * @returns {Image}
-     */
-    loadImg: function (url, option, cb){
-        var l = arguments.length;
-        if(l == 2) cb = option;
-
-        var cachedTex = cc.textureCache.getTextureForKey(url);
-        if (cachedTex) {
-            cb && cb(null, cachedTex);
-        }
-        else if (url.match(jsb.urlRegExp)) {
-            jsb.loadRemoteImg(url, function(succeed, tex) {
-                if (succeed) {
-                    cb && cb(null, tex);
-                }
-                else {
-                    cb && cb("Load image failed");
-                }
-            });
-        }
-        else {
-            cc.textureCache._addImageAsync(url, function (tex){
-                if (tex instanceof cc.Texture2D)
-                    cb && cb(null, tex);
-                else cb && cb("Load image failed");
-            });
-        }
-    },
-    /**
-     * Load binary data by url.
-     * @param {String} url
-     * @param {Function} cb
-     */
-    loadBinary : function(url, cb){
-        cb(null, jsb.fileUtils.getDataFromFile(url));
-    },
-    loadBinarySync : function(url){
-        return jsb.fileUtils.getDataFromFile(url);
-    },
-
-    /**
-     * Iterator function to load res
-     * @param {object} item
-     * @param {number} index
-     * @param {function} [cb]
-     * @returns {*}
-     * @private
-     */
-    _loadResIterator : function(item, index, cb){
-        var self = this, url = null;
-        var type = item.type;
-        if (type) {
-            type = "." + type.toLowerCase();
-            url = item.src ? item.src : item.name + type;
-        } else {
-            url = item;
-            type = cc.path.extname(url);
-        }
-
-        var obj = self.cache[url];
-        if (obj)
-            return cb(null, obj);
-        var loader = null;
-        if (type) {
-            loader = self._register[type.toLowerCase()];
-        }
-        if (!loader) {
-            cc.error("loader for [" + type + "] not exists!");
-            return cb();
-        }
-        var basePath = loader.getBasePath ? loader.getBasePath() : self.resPath;
-        var realUrl = self.getUrl(basePath, url);
-
-        loader.load(realUrl, url, item, function (err, data) {
-            if (err) {
-                cc.log(err);
-                self.cache[url] = null;
-                delete self.cache[url];
-                cb();
-            } else {
-                self.cache[url] = data;
-                cb(null, data);
-            }
-        });
-    },
-
-    /**
-     * Get url with basePath.
-     * @param {string} basePath
-     * @param {string} [url]
-     * @returns {*}
-     */
-    getUrl : function(basePath, url){
-        var self = this, langPathCache = self._langPathCache, path = cc.path;
-        if (basePath !== undefined && url === undefined) {
-            url = basePath;
-            var type = path.extname(url);
-            type = type ? type.toLowerCase() : "";
-            var loader = self._register[type];
-            if(!loader)
-                basePath = self.resPath;
-            else
-                basePath = loader.getBasePath ? loader.getBasePath() : self.resPath;
-        }
-        url = cc.path.join(basePath || "", url);
-        if(url.match(/[\/(\\\\)]lang[\/(\\\\)]/i)){
-            if(langPathCache[url])
-                return langPathCache[url];
-            var extname = path.extname(url) || "";
-            url = langPathCache[url] = url.substring(0, url.length - extname.length) + "_" + cc.sys.language + extname;
-        }
-        return url;
-    },
-
-    /**
-     * Load resources then call the callback.
-     * @param {string} resources
-     * @param {function} [option] callback or trigger
-     * @param {function|Object} [loadCallback]
-     * @return {cc.AsyncPool}
-     */
-    load : function(resources, option, loadCallback){
-        var self = this;
-        var len = arguments.length;
-        if(len === 0)
-            throw new Error("arguments error!");
-
-        if(len === 3){
-            if(typeof option === "function"){
-                if(typeof loadCallback === "function")
-                    option = {trigger : option, cb : loadCallback };
-                else
-                    option = { cb : option, cbTarget : loadCallback};
-            }
-        }else if(len === 2){
-            if(typeof option === "function")
-                option = {cb : option};
-        }else if(len === 1){
-            option = {};
-        }
-
-        if(!(resources instanceof Array))
-            resources = [resources];
-        var asyncPool = new cc.AsyncPool(
-            resources, 0,
-            function (value, index, AsyncPoolCallback, aPool) {
-                self._loadResIterator(value, index, function (err) {
-                    var arr = Array.prototype.slice.call(arguments, 1);
-                    if (option.trigger)
-                        option.trigger.call(option.triggerTarget, arr[0], aPool.size, aPool.finishedSize);   //call trigger
-                    AsyncPoolCallback(err, arr[0]);
-                });
-            },
-            option.cb, option.cbTarget);
-        asyncPool.flow();
-        return asyncPool;
-    },
-
-    loadAliases : function(url, cb){
-        jsb.fileUtils.loadFilenameLookup(url);
-        if(cb) cb();
-    },
-
-    /**
-     * Register a resource loader into loader.
-     * @param {string} extNames
-     * @param {function} loader
-     */
-    register : function(extNames, loader){
-        if(!extNames || !loader) return;
-        var self = this;
-        if (typeof extNames === "string")
-            return this._register[extNames.trim().toLowerCase()] = loader;
-        for(var i = 0, li = extNames.length; i < li; i++) {
-            self._register["." + extNames[i].trim().toLowerCase()] = loader;
-        }
-    },
-
-    /**
-     * Get resource data by url.
-     * @param url
-     * @returns {*}
-     */
-    getRes : function(url){
-        var cached = this.cache[url];
-        if (cached)
-            return cached;
-        var type = cc.path.extname(url);
-        if (!type) return cc.log("cc.loader.getRes: Invalid url");
-        var loader = this._register[type.toLowerCase()];
-        if (!loader) return cc.log("cc.loader.getRes: loader for [" + type + "] not exists!");
-        var basePath = loader.getBasePath ? loader.getBasePath() : this.resPath;
-        var realUrl = this.getUrl(basePath, url);
-        return loader.load(realUrl, url);
-    },
-
-    /**
-     * Release the cache of resource by url.
-     * @param url
-     */
-    release : function(url){
-        var cache = this.cache;
-        delete cache[url];
-    },
-
-    /**
-     * Resource cache of all resources.
-     */
-    releaseAll : function(){
-        var locCache = this.cache;
-        for (var key in locCache)
-            delete locCache[key];
-    }
-
-};
-cc.defineGetterSetter(cc.loader, "resPath", function(){
-    return this._resPath;
-}, function(resPath){
-    this._resPath = resPath || "";
-    jsb.fileUtils.addSearchPath(this._resPath);
-});
-cc.defineGetterSetter(cc.loader, "audioPath", function(){
-    return this._audioPath;
-}, function(audioPath){
-    this._audioPath = audioPath || "";
-    jsb.fileUtils.addSearchPath(this._audioPath);
-});
-
-//+++++++++++++++++++++++++something about loader end+++++++++++++++++++++++++++++
-
-//+++++++++++++++++++++++++something about format string begin+++++++++++++++++++++++++++++
-
-/**
- * A string tool to construct a string with format string.
- * for example:
- *      cc.formatStr("a: %d, b: %b", a, b);
- *      cc.formatStr(a, b, c);
- * @returns {String}
- */
-cc.formatStr = function(){
-    var args = arguments;
-    var l = args.length;
-    if(l < 1)
-        return "";
-
-    var str = args[0];
-    var needToFormat = true;
-    if(typeof str === "object"){
-        needToFormat = false;
-    }
-    for(var i = 1; i < l; ++i){
-        var arg = args[i];
-        if(needToFormat){
-            while(true){
-                var result = null;
-                if(typeof arg === "number"){
-                    result = str.match(/(%d)|(%s)/);
-                    if(result){
-                        str = str.replace(/(%d)|(%s)/, arg);
-                        break;
-                    }
-                }
-                result = str.match(/%s/);
-                if(result)
-                    str = str.replace(/%s/, arg);
-                else
-                    str += "    " + arg;
-                break;
-            }
-        }else
-            str += "    " + arg;
-    }
-    return str;
-};
-
-//+++++++++++++++++++++++Define singleton format string end+++++++++++++++++++++++++++
-
-//+++++++++++++++++++++++Define singleton objects begin+++++++++++++++++++++++++++
+//+++++++++++++++++++++++++Engine initialization function begin+++++++++++++++++++++++++++
 
 // Define singleton objects
 cc.director = cc.Director.getInstance();
+cc.director._actionManager = cc.director.getActionManager();
+cc.director._scheduler = cc.director.getScheduler();
 cc.winSize = cc.director.getWinSize();
 
 cc.view = cc.director.getOpenGLView();
@@ -755,7 +44,7 @@ cc.view.convertToLocationInView = function (tx, ty, relatedPos) {
 cc.view.enableRetina = function(enabled) {};
 cc.view.isRetinaEnabled = function() {
     var sys = cc.sys;
-    return (sys.os == sys.OS_IOS || sys.os == sys.OS_OSX) ? true : false;
+    return (sys.os === sys.OS_IOS || sys.os === sys.OS_OSX) ? true : false;
 };
 cc.view.adjustViewPort = function() {};
 cc.view.resizeWithBrowserSize = function () {return;};
@@ -779,14 +68,16 @@ cc.view.getVisibleOriginInPixel = cc.view.getVisibleOrigin;
 cc.view.setContentTranslateLeftTop = function(){return;};
 cc.view.getContentTranslateLeftTop = function(){return null;};
 cc.view.setFrameZoomFactor = function(){return;};
-cc.DENSITYDPI_DEVICE = "device-dpi";
-cc.DENSITYDPI_HIGH = "high-dpi";
-cc.DENSITYDPI_MEDIUM = "medium-dpi";
-cc.DENSITYDPI_LOW = "low-dpi";
+cc.view.setOrientation = function () {};
 cc.view.setTargetDensityDPI = function() {};
-cc.view.getTargetDensityDPI = function() {return cc.DENSITYDPI_DEVICE;};
+cc.view.getTargetDensityDPI = function() {return cc.macro.DENSITYDPI_DEVICE;};
 
 cc.eventManager = cc.director.getEventDispatcher();
+
+cc.eventManager.addCustomListener('window-resize', function () {
+    cc.winSize = cc.director.getWinSize();
+    cc.visibleRect.init();
+});
 
 cc.audioEngine = cc.AudioEngine.getInstance();
 cc.audioEngine.end = function(){
@@ -794,45 +85,13 @@ cc.audioEngine.end = function(){
     this.stopAllEffects();
 };
 cc.audioEngine.features = {
-    MULTI_CHANNEL: true,
+    MULTI_CHANNEL: true, 
     AUTOPLAY: true
 };
 
 cc.configuration = cc.Configuration.getInstance();
-
 cc.textureCache = cc.director.getTextureCache();
-cc.TextureCache.prototype._addImageAsync = cc.TextureCache.prototype.addImageAsync;
-cc.TextureCache.prototype.addImageAsync = function(url, cb, target) {
-    var localTex = null;
-    cc.loader.loadImg(url, function(err, tex) {
-        if (err) tex = null;
-        if (cb) {
-            cb.call(target, tex);
-        }
-        localTex = tex;
-    });
-    return localTex;
-};
-// Fix for compatibility with old APIs
-cc.TextureCache.prototype._addImage = cc.TextureCache.prototype.addImage;
-cc.TextureCache.prototype.addImage = function(url, cb, target) {
-    if (typeof cb === "function") {
-        return this.addImageAsync(url, cb, target);
-    }
-    else {
-        if (cb) {
-            return this._addImage(url, cb);
-        }
-        else {
-            return this._addImage(url);
-        }
-    }
-};
-
 cc.shaderCache = cc.ShaderCache.getInstance();
-cc.animationCache = cc.AnimationCache.getInstance();
-cc.spriteFrameCache = cc.SpriteFrameCache.getInstance();
-
 cc.plistParser = cc.PlistParser.getInstance();
 
 // File utils (Temporary, won't be accessible)
@@ -855,16 +114,6 @@ cc.screen = {
     }
 };
 
-//+++++++++++++++++++++++Define singleton objects end+++++++++++++++++++++++++++
-
-
-//+++++++++++++++++++++++++Redefine JSB only APIs+++++++++++++++++++++++++++
-
-/**
- * @namespace jsb
- * @name jsb
- */
-var jsb = jsb || {};
 /**
  * @type {Object}
  * @name jsb.fileUtils
@@ -889,28 +138,6 @@ jsb.reflection = {
     }
 };
 
-// Key: ext, Value: callback
-var __JSBDownloadCallbackMap = {};
-var __JSBDownloadIndex = 0;
-
-jsb.onDownloadRemoteFile = function(callbackIndex, arg1, arg2) {
-    if (callbackIndex in __JSBDownloadCallbackMap) {
-        var callback = __JSBDownloadCallbackMap[callbackIndex];
-        if (callback) {
-            callback(arg1, arg2);
-        } else {
-            cc.log("ERROR: jsb.onDownloadRemoteFile, callback is null!");
-        }
-        delete __JSBDownloadCallbackMap[callbackIndex];
-    }
-};
-
-jsb.loadRemoteImg = function(downloadConfig, callback) {
-    __JSBDownloadIndex++;
-    __JSBDownloadCallbackMap[__JSBDownloadIndex] = callback;
-    jsb.__loadRemoteImg(downloadConfig, __JSBDownloadIndex);
-};
-
 //+++++++++++++++++++++++++Redefine JSB only APIs+++++++++++++++++++++++++++++
 
 
@@ -922,11 +149,10 @@ cc.winEvents = {//TODO register hidden and show callback for window
 //+++++++++++++++++++++++++something about window events end+++++++++++++++++++++++++++++
 
 //+++++++++++++++++++++++++something about sys begin+++++++++++++++++++++++++++++
-cc._initSys = function(config, CONFIG_KEY){
+var _initSys = function () {
 
-    var locSys = cc.sys = sys || {},
-        platform,
-        capabilities;
+    cc.sys = window.sys || {};
+    var sys = cc.sys;
 
     /**
      * English language code
@@ -934,111 +160,165 @@ cc._initSys = function(config, CONFIG_KEY){
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_ENGLISH = "en";
+    sys.LANGUAGE_ENGLISH = "en";
+
     /**
      * Chinese language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_CHINESE = "zh";
+    sys.LANGUAGE_CHINESE = "zh";
+
     /**
      * French language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_FRENCH = "fr";
+    sys.LANGUAGE_FRENCH = "fr";
+
     /**
      * Italian language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_ITALIAN = "it";
+    sys.LANGUAGE_ITALIAN = "it";
+
     /**
      * German language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_GERMAN = "de";
+    sys.LANGUAGE_GERMAN = "de";
+
     /**
      * Spanish language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_SPANISH = "es";
+    sys.LANGUAGE_SPANISH = "es";
 
     /**
      * Netherlands language code
      * @type {string}
      */
-    locSys.LANGUAGE_DUTCH = "nl";
+    sys.LANGUAGE_DUTCH = "nl";
     /**
      * Dutch language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_DUTCH = "du";
+    sys.LANGUAGE_DUTCH = "du";
+
     /**
      * Russian language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_RUSSIAN = "ru";
+    sys.LANGUAGE_RUSSIAN = "ru";
+
     /**
      * Korean language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_KOREAN = "ko";
+    sys.LANGUAGE_KOREAN = "ko";
+
     /**
      * Japanese language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_JAPANESE = "ja";
+    sys.LANGUAGE_JAPANESE = "ja";
+
     /**
      * Hungarian language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_HUNGARIAN = "hu";
+    sys.LANGUAGE_HUNGARIAN = "hu";
+
     /**
      * Portuguese language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_PORTUGUESE = "pt";
+    sys.LANGUAGE_PORTUGUESE = "pt";
+
     /**
      * Arabic language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_ARABIC = "ar";
+    sys.LANGUAGE_ARABIC = "ar";
+
     /**
      * Norwegian language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_NORWEGIAN = "no";
+    sys.LANGUAGE_NORWEGIAN = "no";
+
     /**
      * Polish language code
      * @constant
      * @default
      * @type {Number}
      */
-    locSys.LANGUAGE_POLISH = "pl";
+    sys.LANGUAGE_POLISH = "pl";
+
+    /**
+     * Turkish language code
+     * @constant
+     * @default
+     * @type {Number}
+     */
+    sys.LANGUAGE_TURKISH = "tr";
+
+    /**
+     * Ukrainian language code
+     * @constant
+     * @default
+     * @type {Number}
+     */
+    sys.LANGUAGE_UKRAINIAN = "uk";
+
+    /**
+     * Romanian language code
+     * @constant
+     * @default
+     * @type {Number}
+     */
+    sys.LANGUAGE_ROMANIAN = "ro";
+
+    /**
+     * Bulgarian language code
+     * @constant
+     * @default
+     * @type {Number}
+     */
+    sys.LANGUAGE_BULGARIAN = "bg";
+
+    /**
+     * Unknown language code
+     * @memberof cc.sys
+     * @name LANGUAGE_UNKNOWN
+     * @constant
+     * @type {Number}
+     */
+    sys.LANGUAGE_UNKNOWN = "unknown";
 
     /**
      * @memberof cc.sys
@@ -1229,7 +509,7 @@ cc._initSys = function(config, CONFIG_KEY){
      * @default
      * @type {Number}
      */
-    locSys.MOBILE_BROWSER = 100;
+    sys.MOBILE_BROWSER = 100;
     /**
      * @memberof cc.sys
      * @name DESKTOP_BROWSER
@@ -1237,24 +517,28 @@ cc._initSys = function(config, CONFIG_KEY){
      * @default
      * @type {Number}
      */
-    locSys.DESKTOP_BROWSER = 101;
+    sys.DESKTOP_BROWSER = 101;
 
-    locSys.BROWSER_TYPE_WECHAT = "wechat";
-    locSys.BROWSER_TYPE_ANDROID = "androidbrowser";
-    locSys.BROWSER_TYPE_IE = "ie";
-    locSys.BROWSER_TYPE_QQ = "qqbrowser";
-    locSys.BROWSER_TYPE_MOBILE_QQ = "mqqbrowser";
-    locSys.BROWSER_TYPE_UC = "ucbrowser";
-    locSys.BROWSER_TYPE_360 = "360browser";
-    locSys.BROWSER_TYPE_BAIDU_APP = "baiduboxapp";
-    locSys.BROWSER_TYPE_BAIDU = "baidubrowser";
-    locSys.BROWSER_TYPE_MAXTHON = "maxthon";
-    locSys.BROWSER_TYPE_OPERA = "opera";
-    locSys.BROWSER_TYPE_MIUI = "miuibrowser";
-    locSys.BROWSER_TYPE_FIREFOX = "firefox";
-    locSys.BROWSER_TYPE_SAFARI = "safari";
-    locSys.BROWSER_TYPE_CHROME = "chrome";
-    locSys.BROWSER_TYPE_UNKNOWN = "unknown";
+    sys.BROWSER_TYPE_WECHAT = "wechat";
+    sys.BROWSER_TYPE_ANDROID = "androidbrowser";
+    sys.BROWSER_TYPE_IE = "ie";
+    sys.BROWSER_TYPE_QQ = "qqbrowser";
+    sys.BROWSER_TYPE_MOBILE_QQ = "mqqbrowser";
+    sys.BROWSER_TYPE_UC = "ucbrowser";
+    sys.BROWSER_TYPE_360 = "360browser";
+    sys.BROWSER_TYPE_BAIDU_APP = "baiduboxapp";
+    sys.BROWSER_TYPE_BAIDU = "baidubrowser";
+    sys.BROWSER_TYPE_MAXTHON = "maxthon";
+    sys.BROWSER_TYPE_OPERA = "opera";
+    sys.BROWSER_TYPE_OUPENG = "oupeng";
+    sys.BROWSER_TYPE_MIUI = "miuibrowser";
+    sys.BROWSER_TYPE_FIREFOX = "firefox";
+    sys.BROWSER_TYPE_SAFARI = "safari";
+    sys.BROWSER_TYPE_CHROME = "chrome";
+    sys.BROWSER_TYPE_LIEBAO = "liebao";
+    sys.BROWSER_TYPE_QZONE = "qzone";
+    sys.BROWSER_TYPE_SOUGOU = "sogou";
+    sys.BROWSER_TYPE_UNKNOWN = "unknown";
 
     /**
      * Is native ? This is set to be true in jsb auto.
@@ -1262,41 +546,149 @@ cc._initSys = function(config, CONFIG_KEY){
      * @default
      * @type {Boolean}
      */
-    locSys.isNative = true;
+    sys.isNative = true;
 
-    /** Get the target platform of system */
-    locSys.platform = __getPlatform();
+    var platform = sys.platform = __getPlatform();
 
-    /** Get the os of system */
-    locSys.os = __getOS();
+    /**
+     * Indicate whether system is mobile system
+     * @memberof cc.sys
+     * @name isMobile
+     * @type {Boolean}
+     */
+    sys.isMobile = (platform === sys.ANDROID || 
+                    platform === sys.IPAD || 
+                    platform === sys.IPHONE || 
+                    platform === sys.WP8 || 
+                    platform === sys.TIZEN ||
+                    platform === sys.BLACKBERRY) ? true : false;
+    
+    sys._application = cc.Application.getInstance();
 
-    // Forces the garbage collector
-    locSys.garbageCollect = function() {
+    /**
+     * Indicate the current language of the running system
+     * @memberof cc.sys
+     * @name language
+     * @type {String}
+     */
+    sys.language = (function(){
+        var language = sys._application.getCurrentLanguage();
+        switch(language){
+            case 0: return sys.LANGUAGE_ENGLISH;
+            case 1: return sys.LANGUAGE_CHINESE;
+            case 2: return sys.LANGUAGE_FRENCH;
+            case 3: return sys.LANGUAGE_ITALIAN;
+            case 4: return sys.LANGUAGE_GERMAN;
+            case 5: return sys.LANGUAGE_SPANISH;
+            case 6: return sys.LANGUAGE_DUTCH;
+            case 7: return sys.LANGUAGE_RUSSIAN;
+            case 8: return sys.LANGUAGE_KOREAN;
+            case 9: return sys.LANGUAGE_JAPANESE;
+            case 10: return sys.LANGUAGE_HUNGARIAN;
+            case 11: return sys.LANGUAGE_PORTUGUESE;
+            case 12: return sys.LANGUAGE_ARABIC;
+            case 13: return sys.LANGUAGE_NORWEGIAN;
+            case 14: return sys.LANGUAGE_POLISH;
+            case 15: return sys.LANGUAGE_TURKISH;
+            case 16: return sys.LANGUAGE_UKRAINIAN;
+            case 17: return sys.LANGUAGE_ROMANIAN;
+            case 18: return sys.LANGUAGE_BULGARIAN;
+            default: return sys.LANGUAGE_ENGLISH;
+        }
+    })();
+
+    sys.os = __getOS();
+
+    sys.browserType = null; //null in jsb
+
+    sys.browserVersion = null; //null in jsb
+
+    sys.windowPixelResolution = cc.view.getFrameSize();
+
+    var capabilities = sys.capabilities = {
+        "canvas": false,
+        "opengl": true
+    };
+    if( sys.isMobile ) {
+        capabilities["accelerometer"] = true;
+        capabilities["touches"] = true;
+        if (platform === sys.WINRT || platform === sys.WP8) {
+            capabilities["keyboard"] = true;
+        }
+    } else {
+        // desktop
+        capabilities["keyboard"] = true;
+        capabilities["mouse"] = true;
+        // winrt can't suppot mouse in current version
+        if (platform === sys.WINRT || platform === sys.WP8)
+        {
+            capabilities["touches"] = true;
+            capabilities["mouse"] = false;
+        }
+    }
+
+    /**
+     * Forces the garbage collection, only available in JSB
+     * @memberof cc.sys
+     * @name garbageCollect
+     * @function
+     */
+    sys.garbageCollect = function() {
         __jsc__.garbageCollect();
     };
 
-    // Dumps rooted objects
-    locSys.dumpRoot = function() {
+    /**
+     * Dumps rooted objects, only available in JSB
+     * @memberof cc.sys
+     * @name dumpRoot
+     * @function
+     */
+    sys.dumpRoot = function() {
         __jsc__.dumpRoot();
     };
 
-    // restarts the JS VM
-    locSys.restartVM = function() {
+    /**
+     * Restart the JS VM, only available in JSB
+     * @memberof cc.sys
+     * @name restartVM
+     * @function
+     */
+    sys.restartVM = function() {
         __restartVM();
     };
 
-    // clean a singal js file
-    locSys.cleanScript = function(jsFile) {
+    /**
+     * Clean a script in the JS VM, only available in JSB
+     * @memberof cc.sys
+     * @name cleanScript
+     * @param {String} jsfile
+     * @function
+     */
+    sys.cleanScript = function(jsFile) {
         __cleanScript(jsFile);
     };
 
-    // Check whether an object is valid
-    locSys.isObjectValid = function(obj) {
+    /**
+     * Check whether an object is valid,
+     * In web engine, it will return true if the object exist
+     * In native engine, it will return true if the JS object and the correspond native object are both valid
+     * @memberof cc.sys
+     * @name isObjectValid
+     * @param {Object} obj
+     * @return {boolean} Validity of the object
+     * @function
+     */
+    sys.isObjectValid = function(obj) {
         return __isObjectValid(obj);
     };
 
-
-    locSys.dump = function(){
+    /**
+     * Dump system informations
+     * @memberof cc.sys
+     * @name dump
+     * @function
+     */
+    sys.dump = function () {
         var self = this;
         var str = "";
         str += "isMobile : " + self.isMobile + "\r\n";
@@ -1308,344 +700,62 @@ cc._initSys = function(config, CONFIG_KEY){
         cc.log(str);
     };
 
-    platform = locSys.platform;
-    locSys.isMobile = ( platform === locSys.ANDROID ||
-                        platform === locSys.IPAD ||
-                        platform === locSys.IPHONE ) ? true : false;
-
-    locSys.language = (function(){
-        var language = cc.Application.getInstance().getCurrentLanguage();
-        switch(language){
-            case 0: return locSys.LANGUAGE_ENGLISH;
-            case 1: return locSys.LANGUAGE_CHINESE;
-            case 2: return locSys.LANGUAGE_FRENCH;
-            case 3: return locSys.LANGUAGE_ITALIAN;
-            case 4: return locSys.LANGUAGE_GERMAN;
-            case 5: return locSys.LANGUAGE_SPANISH;
-            case 6: return locSys.LANGUAGE_DUTCH;
-            case 7: return locSys.LANGUAGE_RUSSIAN;
-            case 8: return locSys.LANGUAGE_KOREAN;
-            case 9: return locSys.LANGUAGE_JAPANESE;
-            case 10: return locSys.LANGUAGE_HUNGARIAN;
-            case 11: return locSys.LANGUAGE_PORTUGUESE;
-            case 12: return locSys.LANGUAGE_ARABIC;
-            case 13: return locSys.LANGUAGE_NORWEGIAN;
-            case 14: return locSys.LANGUAGE_POLISH;
-            default : return locSys.LANGUAGE_ENGLISH;
-        }
-    })();
-
-    /**
-     * Indicate the real pixel resolution of the whole game window
-     * @memberof cc.sys
-     * @name windowPixelResolution
-     * @type {Number}
-     */
-    locSys.windowPixelResolution = cc.view.getFrameSize();
-
-    /** The type of browser */
-    locSys.browserType = null; //null in jsb
-    /** The version of browser */
-    locSys.browserVersion = null; //null in jsb
-
-    capabilities = locSys.capabilities = {"opengl":true};
-    if( locSys.isMobile ) {
-        capabilities["accelerometer"] = true;
-        capabilities["touches"] = true;
-    } else {
-        // desktop
-        capabilities["keyboard"] = true;
-        capabilities["mouse"] = true;
-    }
-
     /**
      * Open a url in browser
      * @memberof cc.sys
      * @name openURL
      * @param {String} url
      */
-    locSys.openURL = function(url){
-        cc.Application.getInstance().openURL(url);
+    sys.openURL = function(url){
+        sys._application.openURL(url);
+    };
+
+    sys.now = function () {
+        return Date.now();
+    };
+
+    // JS to Native bridges
+    if(window.JavascriptJavaBridge && cc.sys.os == cc.sys.OS_ANDROID){
+        jsb.reflection = new JavascriptJavaBridge();
+        cc.sys.capabilities["keyboard"] = true;
+    }
+    else if(window.JavaScriptObjCBridge && (cc.sys.os == cc.sys.OS_IOS || cc.sys.os == cc.sys.OS_OSX)){
+        jsb.reflection = new JavaScriptObjCBridge();
     }
 };
-
-//+++++++++++++++++++++++++something about sys end+++++++++++++++++++++++++++++
-//+++++++++++++++++++++++++something about log start++++++++++++++++++++++++++++
-/**
- * Init Debug setting.
- * @function
- */
-cc._initDebugSetting = function (mode) {
-    var ccGame = cc.game;
-    var bakLog = cc._cocosplayerLog || cc.log || log;
-    cc.log = cc.warn = cc.error = cc.assert = function(){};
-    if(mode == ccGame.DEBUG_MODE_NONE){
-    }else{
-        cc.error = function(){
-            bakLog.call(this, "ERROR :  " + cc.formatStr.apply(cc, arguments));
-        };
-        cc.assert = function(cond, msg) {
-            if (!cond && msg) {
-                var args = [];
-                for (var i = 1; i < arguments.length; i++)
-                    args.push(arguments[i]);
-                bakLog("Assert: " + cc.formatStr.apply(cc, args));
-            }
-        };
-        if(mode != ccGame.DEBUG_MODE_ERROR && mode != ccGame.DEBUG_MODE_ERROR_FOR_WEB_PAGE){
-            cc.warn = function(){
-                bakLog.call(this, "WARN :  " + cc.formatStr.apply(cc, arguments));
-            };
-        }
-        if(mode == ccGame.DEBUG_MODE_INFO || mode == ccGame.DEBUG_MODE_INFO_FOR_WEB_PAGE){
-            cc.log = function(){
-                bakLog.call(this, cc.formatStr.apply(cc, arguments));
-            };
-        }
-    }
-};
-//+++++++++++++++++++++++++something about log end+++++++++++++++++++++++++++++
-
-
-//+++++++++++++++++++++++++something about CCGame begin+++++++++++++++++++++++++++
-
-/**
- * An object to boot the game.
- * @class
- * @name cc.game
- */
-cc.game = {
-    DEBUG_MODE_NONE : 0,
-    DEBUG_MODE_INFO : 1,
-    DEBUG_MODE_WARN : 2,
-    DEBUG_MODE_ERROR : 3,
-    DEBUG_MODE_INFO_FOR_WEB_PAGE : 4,
-    DEBUG_MODE_WARN_FOR_WEB_PAGE : 5,
-    DEBUG_MODE_ERROR_FOR_WEB_PAGE : 6,
-
-    EVENT_HIDE: "game_on_hide",
-    EVENT_SHOW: "game_on_show",
-
-    /**
-     * Key of config
-     * @constant
-     * @default
-     * @type {Object}
-     */
-    CONFIG_KEY : {
-        engineDir : "engineDir",
-        dependencies : "dependencies",
-        debugMode : "debugMode",
-        showFPS : "showFPS",
-        frameRate : "frameRate",
-        id : "id",
-        renderMode : "renderMode",
-        jsList : "jsList",
-        classReleaseMode : "classReleaseMode"
-    },
-
-    _prepareCalled : false,//whether the prepare function has been called
-    _prepared : false,//whether the engine has prepared
-    _paused : false,//whether the game is paused
-
-    _intervalId : null,//interval target of main
-
-
-    /**
-     * Config of game
-     * @type {Object}
-     */
-    config : null,
-
-    /**
-     * Callback when the scripts of engine have been load.
-     * @type {Function}
-     */
-    onStart : null,
-
-    /**
-     * Callback when game exits.
-     * @type {Function}
-     */
-    onExit : null,
-    /**
-     * Callback before game resumes.
-     * @type {Function}
-     */
-    onBeforeResume : null,
-    /**
-     * Callback after game resumes.
-     * @type {Function}
-     */
-    onAfterResume : null,
-    /**
-     * Callback before game pauses.
-     * @type {Function}
-     */
-    onBeforePause : null,
-    /**
-     * Callback after game pauses.
-     * @type {Function}
-     */
-    onAfterPause : null,
-
-    /**
-     * Set frameRate of game.
-     * @param frameRate
-     */
-    setFrameRate : function(frameRate){
-        var self = this, config = self.config, CONFIG_KEY = self.CONFIG_KEY;
-        config[CONFIG_KEY.frameRate] = frameRate;
-        cc.director.setAnimationInterval(1.0/frameRate);
-    },
-
-    /**
-     * Restart game.
-     */
-    restart: function () {
-        __restartVM();
-    },
-
-    /**
-     * Run game.
-     */
-    run : function(){
-        var self = this;
-        if(!self._prepareCalled){
-            self.prepare(function(){
-                self.onStart();
-            });
-        }else{
-            self.onStart();
-        }
-    },
-
-    /**
-     * Init config.
-     * @param cb
-     * @returns {*}
-     * @private
-     */
-    _initConfig : function(){
-        cc._initDebugSetting(1);
-        var self = this, CONFIG_KEY = self.CONFIG_KEY;
-        var _init = function(cfg){
-            cfg[CONFIG_KEY.engineDir] = cfg[CONFIG_KEY.engineDir] || "frameworks/cocos2d-html5";
-            cfg[CONFIG_KEY.debugMode] = cfg[CONFIG_KEY.debugMode] || 0;
-            cfg[CONFIG_KEY.frameRate] = cfg[CONFIG_KEY.frameRate] || 60;
-            cfg[CONFIG_KEY.renderMode] = cfg[CONFIG_KEY.renderMode] || 0;
-            cfg[CONFIG_KEY.showFPS] = typeof cfg[CONFIG_KEY.showFPS] === 'undefined' ? true : cfg[CONFIG_KEY.showFPS];
-            return cfg;
-        };
-        try{
-            var isRuntime = typeof runtime !== 'undefined';
-            var txt;
-
-            if (isRuntime) {
-                txt = jsb.fileUtils.getStringFromFile("project-runtime.json");
-            }
-            
-            if (txt && txt.length > 0) {
-                var data = JSON.parse(txt);
-                this.config = _init(data || {});
-            }
-            else {
-                txt = jsb.fileUtils.getStringFromFile("project.json");
-                var data = JSON.parse(txt);
-                this.config = _init(data || {});
-            }
-        }catch(e){
-            cc.log("Failed to read or parse project.json");
-            this.config = _init({});
-        }
-        cc._initDebugSetting(this.config[CONFIG_KEY.debugMode]);
-        cc.director.setDisplayStats(this.config[CONFIG_KEY.showFPS]);
-        cc.director.setAnimationInterval(1.0/this.config[CONFIG_KEY.frameRate]);
-        cc._initSys(this.config, CONFIG_KEY);
-    },
-
-    //cache for js and module that has added into jsList to be loaded.
-    _jsAddedCache : {},
-    _getJsListOfModule : function(moduleMap, moduleName, dir){
-        var jsAddedCache = this._jsAddedCache;
-        if(jsAddedCache[moduleName]) return null;
-        dir = dir || "";
-        var jsList = [];
-        var tempList = moduleMap[moduleName];
-        if(!tempList) throw "can not find module [" + moduleName + "]";
-        var ccPath = cc.path;
-        for(var i = 0, li = tempList.length; i < li; i++){
-            var item = tempList[i];
-            if(jsAddedCache[item]) continue;
-            var extname = ccPath.extname(item);
-            if(!extname) {
-                var arr = this._getJsListOfModule(moduleMap, item, dir);
-                if(arr) jsList = jsList.concat(arr);
-            }else if(extname.toLowerCase() == ".js") jsList.push(ccPath.join(dir, item));
-            jsAddedCache[item] = true;
-        }
-        return jsList;
-    },
-    /**
-     * Prepare game.
-     * @param cb
-     */
-    prepare : function(cb){
-        var self = this, config = self.config, CONFIG_KEY = self.CONFIG_KEY, loader = cc.loader;
-        require("script/jsb.js");
-        self._prepareCalled = true;
-        loader.loadJsWithImg("", config[CONFIG_KEY.jsList] || [], function(err){
-            if(err) throw err;
-            self._prepared = true;
-            if(cb) cb();
-        });
-    }
-};
-cc.game._initConfig();
+_initSys();
 
 //+++++++++++++++++++++++++something about CCGame end+++++++++++++++++++++++++++++
 
-//+++++++++++++++++++++++++other initializations+++++++++++++++++++++++++++++
+// Original bind in Spidermonkey v33 will trigger object life cycle track issue in our memory model and cause crash
+Function.prototype.bind = function (oThis, ...aArgs) {
+    if (typeof this !== 'function') {
+        // closest thing possible to the ECMAScript 5
+        // internal IsCallable function
+        throw new TypeError("Function.prototype.bind - what is trying to be bound is not callable");
+    }
 
-// JS to Native bridges
-if(window.JavascriptJavaBridge && cc.sys.os == cc.sys.OS_ANDROID){
-    jsb.reflection = new JavascriptJavaBridge();
-    cc.sys.capabilities["keyboard"] = true;
-}
-else if(window.JavaScriptObjCBridge && (cc.sys.os == cc.sys.OS_IOS || cc.sys.os == cc.sys.OS_OSX)){
-    jsb.reflection = new JavaScriptObjCBridge();
-}
+    var fToBind = this,
+        fNOP = function () {},
+        fBound = function (...args) {
+            return fToBind.apply(this instanceof fNOP && oThis
+                ? this
+                : oThis,
+                aArgs.concat(args));
+        };
 
-jsb.urlRegExp = new RegExp(
-    "^" +
-        // protocol identifier
-        "(?:(?:https?|ftp)://)" +
-        // user:pass authentication
-        "(?:\\S+(?::\\S*)?@)?" +
-        "(?:" +
-            // IP address dotted notation octets
-            // excludes loopback network 0.0.0.0
-            // excludes reserved space >= 224.0.0.0
-            // excludes network & broacast addresses
-            // (first & last IP address of each class)
-            "(?:[1-9]\\d?|1\\d\\d|2[01]\\d|22[0-3])" +
-            "(?:\\.(?:1?\\d{1,2}|2[0-4]\\d|25[0-5])){2}" +
-            "(?:\\.(?:[1-9]\\d?|1\\d\\d|2[0-4]\\d|25[0-4]))" +
-        "|" +
-            // host name
-            "(?:(?:[a-z\\u00a1-\\uffff0-9]-*)*[a-z\\u00a1-\\uffff0-9]+)" +
-            // domain name
-            "(?:\\.(?:[a-z\\u00a1-\\uffff0-9]-*)*[a-z\\u00a1-\\uffff0-9]+)*" +
-            // TLD identifier
-            "(?:\\.(?:[a-z\\u00a1-\\uffff]{2,}))" +
-        "|" +
-            "(?:localhost)" +
-        ")" +
-        // port number
-        "(?::\\d{2,5})?" +
-        // resource path
-        "(?:/\\S*)?" +
-    "$", "i"
-);
+    fNOP.prototype = this.prototype;
+    fBound.prototype = new fNOP();
 
-//+++++++++++++++++++++++++other initializations end+++++++++++++++++++++++++++++
+    return fBound;
+};
+
+jsb.urlRegExp = new RegExp("^(?:https?|ftp)://\\S*$", "i");
+
+cc._engineLoaded = false;
+
+(function (config) {
+    require("script/jsb.js");
+    cc._engineLoaded = true;
+    console.log(cc.ENGINE_VERSION);
+})();

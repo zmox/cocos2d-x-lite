@@ -78,7 +78,7 @@ namespace ui {
          * This method is called when the return button was pressed or the outside area of keyboard was touched.
          * @param editBox The edit box object that generated the event.
          */
-        virtual void editBoxReturn(EditBox* editBox) = 0;
+        virtual void editBoxEditingReturn(EditBox* editBox) = 0;
 
     };
 
@@ -184,7 +184,12 @@ namespace ui {
             /**
              * Capitalize all characters automatically.
              */
-             INITIAL_CAPS_ALL_CHARACTERS,
+            INITIAL_CAPS_ALL_CHARACTERS,
+
+            /**
+             * Lowercase all characters automatically.
+             */
+            LOWERCASE_ALL_CHARACTERS
         };
 
         /**
@@ -396,6 +401,8 @@ namespace ui {
          */
         int getMaxLength();
 
+        ui::Scale9Sprite* getBackgroundSprite() const;
+
         /**
          * Set the input flags that are to be applied to the edit box.
          * @param inputFlag One of the EditBox::InputFlag constants.
@@ -498,4 +505,3 @@ namespace ui {
 NS_CC_END
 
 #endif /* __UIEDITTEXT_H__ */
-

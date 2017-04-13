@@ -79,24 +79,45 @@ void EditBoxImplCommon::initInactiveLabels(const Size& size)
     const char* pDefaultFontName = this->getNativeDefaultFontName();
 
     _label = Label::create();
-    _label->setAnchorPoint(Vec2::ANCHOR_MIDDLE_LEFT);
+    _label->setAnchorPoint(Vec2(0,1));
+    _label->setOverflow(Label::Overflow::CLAMP);
     _label->setColor(Color3B::WHITE);
     _label->setVisible(false);
     _editBox->addChild(_label, kLabelZOrder);
 
     _labelPlaceHolder = Label::create();
-    _labelPlaceHolder->setAnchorPoint(Vec2::ANCHOR_MIDDLE_LEFT);
+    _labelPlaceHolder->setAnchorPoint(Vec2(0,1));
     _labelPlaceHolder->setColor(Color3B::GRAY);
     _editBox->addChild(_labelPlaceHolder, kLabelZOrder);
 
     setFont(pDefaultFontName, size.height*2/3);
     setPlaceholderFont(pDefaultFontName, size.height*2/3);
+    
 }
 
-void EditBoxImplCommon::placeInactiveLabels()
+void EditBoxImplCommon::placeInactiveLabels(const Size& size)
 {
-    _label->setPosition(CC_EDIT_BOX_PADDING, _contentSize.height / 2.0f);
-    _labelPlaceHolder->setPosition(CC_EDIT_BOX_PADDING, _contentSize.height / 2.0f);
+    _label->setDimensions(size.width, size.height);
+    
+    auto placeholderSize = _labelPlaceHolder->getContentSize();
+    
+    if(_editBoxInputMode == EditBox::InputMode::ANY){
+        _label->setPosition(Vec2(CC_EDIT_BOX_PADDING, size.height - CC_EDIT_BOX_PADDING));
+        _label->setVerticalAlignment(TextVAlignment::TOP);
+        _label->enableWrap(true);
+        
+        _labelPlaceHolder->setPosition(Vec2(CC_EDIT_BOX_PADDING, size.height - CC_EDIT_BOX_PADDING));
+        _labelPlaceHolder->setVerticalAlignment(TextVAlignment::TOP);
+    }
+    else {
+        _label->enableWrap(false);
+        _label->setPosition(Vec2(CC_EDIT_BOX_PADDING, size.height));
+        _label->setVerticalAlignment(TextVAlignment::CENTER);
+        
+        _labelPlaceHolder->setPosition(Vec2(CC_EDIT_BOX_PADDING,
+                                            (size.height + placeholderSize.height) / 2));
+        _labelPlaceHolder->setVerticalAlignment(TextVAlignment::CENTER);
+    }
 }
 
 void EditBoxImplCommon::setInactiveText(const char* pText)
@@ -168,6 +189,7 @@ void EditBoxImplCommon::setInputMode(EditBox::InputMode inputMode)
 {
     _editBoxInputMode = inputMode;
     this->setNativeInputMode(inputMode);
+    this->placeInactiveLabels(_editBox->getContentSize());
 }
 
 void EditBoxImplCommon::setMaxLength(int maxLength)
@@ -225,11 +247,6 @@ void EditBoxImplCommon::setPlaceHolder(const char* pText)
     if (pText != NULL)
     {
         _placeHolder = pText;
-        if (_placeHolder.length() > 0 && _text.length() == 0)
-        {
-            _labelPlaceHolder->setVisible(true);
-        }
-
         _labelPlaceHolder->setString(_placeHolder);
         this->setNativePlaceHolder(pText);
     }
@@ -238,14 +255,23 @@ void EditBoxImplCommon::setPlaceHolder(const char* pText)
 
 void EditBoxImplCommon::setVisible(bool visible)
 {
-    this->setNativeVisible(visible);
+    if (visible)
+    {
+        refreshInactiveText();
+    }
+    else
+    {
+        this->setNativeVisible(visible);
+        _label->setVisible(visible);
+        _labelPlaceHolder->setVisible(visible);
+    }
 }
 
 void EditBoxImplCommon::setContentSize(const Size& size)
 {
     _contentSize = size;
     CCLOG("[Edit text] content size = (%f, %f)", size.width, size.height);
-    placeInactiveLabels();
+    placeInactiveLabels(size);
 }
 
 void EditBoxImplCommon::draw(Renderer *renderer, const Mat4 &transform, uint32_t flags)
@@ -269,7 +295,7 @@ void EditBoxImplCommon::openKeyboard()
 {
     _label->setVisible(false);
     _labelPlaceHolder->setVisible(false);
-
+    this->setNativeVisible(true);
     this->nativeOpenKeyboard();
 }
 
@@ -281,18 +307,7 @@ void EditBoxImplCommon::closeKeyboard()
 void EditBoxImplCommon::onEndEditing(const std::string& text)
 {
     this->setNativeVisible(false);
-
-    if(text.empty())
-    {
-        _label->setVisible(false);
-        _labelPlaceHolder->setVisible(true);
-    }
-    else
-    {
-        _label->setVisible(true);
-        _labelPlaceHolder->setVisible(false);
-        setInactiveText(text.c_str());
-    }
+    refreshInactiveText();
 }
 
 void EditBoxImplCommon::editBoxEditingDidBegin()
@@ -306,38 +321,35 @@ void EditBoxImplCommon::editBoxEditingDidBegin()
     }
 
 #if CC_ENABLE_SCRIPT_BINDING
-    if (nullptr != _editBox && 0 != _editBox->getScriptEditBoxHandler() && ScriptEngineManager::ShareInstance)
+    if (nullptr != _editBox && 0 != _editBox->getScriptEditBoxHandler())
     {
         cocos2d::CommonScriptData data(_editBox->getScriptEditBoxHandler(), "began", _editBox);
         cocos2d::ScriptEvent event(cocos2d::kCommonEvent, (void *)&data);
-        cocos2d::ScriptEngineManager::ShareInstance->getScriptEngine()->sendEvent(&event);
+        cocos2d::ScriptEngineManager::getInstance()->getScriptEngine()->sendEvent(&event);
     }
 #endif
 }
 
 void EditBoxImplCommon::editBoxEditingDidEnd(const std::string& text)
 {
-    // LOGD("textFieldShouldEndEditing...");
     _text = text;
-    this->refreshInactiveText();
 
     cocos2d::ui::EditBoxDelegate *pDelegate = _editBox->getDelegate();
     if (pDelegate != nullptr)
     {
         pDelegate->editBoxEditingDidEnd(_editBox);
-        pDelegate->editBoxReturn(_editBox);
     }
 
 #if CC_ENABLE_SCRIPT_BINDING
-    if (_editBox != nullptr && 0 != _editBox->getScriptEditBoxHandler() && ScriptEngineManager::ShareInstance)
+    if (_editBox != nullptr && 0 != _editBox->getScriptEditBoxHandler())
     {
         cocos2d::CommonScriptData data(_editBox->getScriptEditBoxHandler(), "ended", _editBox);
         cocos2d::ScriptEvent event(cocos2d::kCommonEvent, (void *)&data);
-        cocos2d::ScriptEngineManager::ShareInstance->getScriptEngine()->sendEvent(&event);
+        cocos2d::ScriptEngineManager::getInstance()->getScriptEngine()->sendEvent(&event);
         memset(data.eventName, 0, sizeof(data.eventName));
         strncpy(data.eventName, "return", sizeof(data.eventName));
         event.data = (void *)&data;
-        cocos2d::ScriptEngineManager::ShareInstance->getScriptEngine()->sendEvent(&event);
+        cocos2d::ScriptEngineManager::getInstance()->getScriptEngine()->sendEvent(&event);
     }
 #endif
 
@@ -358,13 +370,22 @@ void EditBoxImplCommon::editBoxEditingChanged(const std::string& text)
     }
 
 #if CC_ENABLE_SCRIPT_BINDING
-    if (NULL != _editBox && 0 != _editBox->getScriptEditBoxHandler() && ScriptEngineManager::ShareInstance)
+    if (NULL != _editBox && 0 != _editBox->getScriptEditBoxHandler())
     {
         cocos2d::CommonScriptData data(_editBox->getScriptEditBoxHandler(), "changed", _editBox);
         cocos2d::ScriptEvent event(cocos2d::kCommonEvent, (void *)&data);
-        cocos2d::ScriptEngineManager::ShareInstance->getScriptEngine()->sendEvent(&event);
+        cocos2d::ScriptEngineManager::getInstance()->getScriptEngine()->sendEvent(&event);
     }
 #endif
+}
+    
+void  EditBoxImplCommon::editBoxEditingReturn()
+{
+    cocos2d::ui::EditBoxDelegate *pDelegate = _editBox->getDelegate();
+    if (pDelegate != nullptr)
+    {
+        pDelegate->editBoxEditingReturn(_editBox);
+    }
 }
 
 
