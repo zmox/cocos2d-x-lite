@@ -19,11 +19,14 @@ LOCAL_SRC_FILES := ../auto/jsb_cocos2dx_extension_auto.cpp \
                    ../auto/jsb_cocos2dx_ui_auto.cpp \
                    ../auto/jsb_cocos2dx_network_auto.cpp \
                    ../auto/jsb_creator_auto.cpp \
+                   ../auto/jsb_box2d_auto.cpp \
                    ../auto/js_bindings_chipmunk_auto_classes.cpp \
                    ../auto/js_bindings_chipmunk_functions.cpp \
                    ../manual/ScriptingCore.cpp \
                    ../manual/cocos2d_specifics.cpp \
                    ../manual/js_manual_conversions.cpp \
+                   ../manual/creator/js_bindings_creator_manual.cpp \
+                   ../manual/box2d/js_bindings_box2d_manual.cpp \
                    ../manual/js_bindings_core.cpp \
                    ../manual/js_bindings_opengl.cpp \
                    ../manual/jsb_opengl_functions.cpp \
@@ -77,8 +80,6 @@ LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/../manual \
                            $(LOCAL_PATH)/../../../audio/include
 
 LOCAL_EXPORT_LDLIBS := -lz
-
-LOCAL_WHOLE_STATIC_LIBRARIES := cocos2d_js_android_static
 
 LOCAL_STATIC_LIBRARIES := cocos2dx_static
 LOCAL_STATIC_LIBRARIES += spidermonkey_static

@@ -1579,9 +1579,9 @@ bool ScriptingCore::executeFunctionWithOwner(jsval owner, const char *name, cons
 bool ScriptingCore::executeFunctionWithOwner(jsval owner, const char *name, const JS::HandleValueArray& args, JS::MutableHandleValue retVal)
 {
     bool bRet = false;
-    bool hasAction;
+    bool hasFunc;
     JSContext* cx = this->_cx;
-    JS::RootedValue temp_retval(cx);
+    JS::RootedValue funcVal(cx);
     JS::RootedValue ownerval(cx, owner);
     JS::RootedObject obj(cx, ownerval.toObjectOrNull());
 
@@ -1589,15 +1589,15 @@ bool ScriptingCore::executeFunctionWithOwner(jsval owner, const char *name, cons
     {
         JSAutoCompartment ac(cx, obj);
 
-        if (JS_HasProperty(cx, obj, name, &hasAction) && hasAction) {
-            if (!JS_GetProperty(cx, obj, name, &temp_retval)) {
+        if (JS_HasProperty(cx, obj, name, &hasFunc) && hasFunc) {
+            if (!JS_GetProperty(cx, obj, name, &funcVal)) {
                 break;
             }
-            if (temp_retval == JSVAL_VOID) {
+            if (funcVal == JSVAL_VOID) {
                 break;
             }
 
-            bRet = JS_CallFunctionName(cx, obj, name, args, retVal);
+            bRet = JS_CallFunctionValue(cx, obj, funcVal, args, retVal);
         }
     }while(0);
     return bRet;
@@ -1611,27 +1611,29 @@ std::chrono::steady_clock::time_point ScriptingCore::getEngineStartTime() const
 
 bool ScriptingCore::handleKeyboardEvent(void* nativeObj, cocos2d::EventKeyboard::KeyCode keyCode, bool isPressed, cocos2d::Event* event)
 {
-    JSAutoCompartment ac(_cx, _global->get());
-
     js_proxy_t * p = jsb_get_native_proxy(nativeObj);
     if (nullptr == p)
         return false;
+    
+    JS::RootedObject listener(_cx, p->obj);
+    JSAutoCompartment ac(_cx, listener);
 
     bool ret = false;
 
     js_type_class_t *typeClass = js_get_type_from_native<cocos2d::EventKeyboard>((cocos2d::EventKeyboard*)event);
-    jsval args[2] = {
-        int32_to_jsval(_cx, (int32_t)keyCode),
-        OBJECT_TO_JSVAL(jsb_get_or_create_weak_jsobject(_cx, event, typeClass))
-    };
+    JS::AutoValueVector valArr(_cx);
+    valArr.append( int32_to_jsval(_cx, (int32_t)keyCode) );
+    valArr.append( OBJECT_TO_JSVAL(jsb_get_or_create_weak_jsobject(_cx, event, typeClass)) );
+    
+    JS::HandleValueArray args(valArr);
 
     if (isPressed)
     {
-        ret = executeFunctionWithOwner(OBJECT_TO_JSVAL(p->obj), "_onKeyPressed", 2, args);
+        ret = executeFunctionWithOwner(OBJECT_TO_JSVAL(p->obj), "_onKeyPressed", args);
     }
     else
     {
-        ret = executeFunctionWithOwner(OBJECT_TO_JSVAL(p->obj), "_onKeyReleased", 2, args);
+        ret = executeFunctionWithOwner(OBJECT_TO_JSVAL(p->obj), "_onKeyReleased", args);
     }
     
     // event is created on the heap and its destructor won't be invoked, so we need to remove JS object manually
@@ -1701,7 +1703,6 @@ int ScriptingCore::executeCustomTouchEvent(EventTouch::EventCode eventType, Touc
     executeFunctionWithOwner(OBJECT_TO_JSVAL(obj), funcName.c_str(), 1, &jsTouch, &retval);
 
     return 1;
-
 }
 
 int ScriptingCore::executeCustomTouchEvent(EventTouch::EventCode eventType,
