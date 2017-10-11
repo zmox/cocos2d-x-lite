@@ -26,7 +26,6 @@
 
 'use strict';
 
-
 //+++++++++++++++++++++++++Engine initialization function begin+++++++++++++++++++++++++++
 
 // Define singleton objects
@@ -62,6 +61,7 @@ cc.view.setResolutionPolicy = function(resolutionPolicy){
     var size = cc.view.getDesignResolutionSize();
     cc.view.setDesignResolutionSize(size.width,size.height,resolutionPolicy);
 };
+
 cc.view.getCanvasSize = cc.view.getFrameSize;
 cc.view.getVisibleSizeInPixel = cc.view.getVisibleSize;
 cc.view.getVisibleOriginInPixel = cc.view.getVisibleOrigin;
@@ -74,20 +74,10 @@ cc.view.getTargetDensityDPI = function() {return cc.macro.DENSITYDPI_DEVICE;};
 
 cc.eventManager = cc.director.getEventDispatcher();
 
-cc.eventManager.addCustomListener('window-resize', function () {
+cc.eventManager._resizeListener = cc.eventManager.addCustomListener('window-resize', function () {
     cc.winSize = cc.director.getWinSize();
     cc.visibleRect.init();
 });
-
-cc.audioEngine = cc.AudioEngine.getInstance();
-cc.audioEngine.end = function(){
-    this.stopMusic();
-    this.stopAllEffects();
-};
-cc.audioEngine.features = {
-    MULTI_CHANNEL: true, 
-    AUTOPLAY: true
-};
 
 cc.configuration = cc.Configuration.getInstance();
 cc.textureCache = cc.director.getTextureCache();
@@ -727,32 +717,12 @@ _initSys();
 
 //+++++++++++++++++++++++++something about CCGame end+++++++++++++++++++++++++++++
 
-// Original bind in Spidermonkey v33 will trigger object life cycle track issue in our memory model and cause crash
-Function.prototype.bind = function (oThis, ...aArgs) {
-    if (typeof this !== 'function') {
-        // closest thing possible to the ECMAScript 5
-        // internal IsCallable function
-        throw new TypeError("Function.prototype.bind - what is trying to be bound is not callable");
-    }
-
-    var fToBind = this,
-        fNOP = function () {},
-        fBound = function (...args) {
-            return fToBind.apply(this instanceof fNOP && oThis
-                ? this
-                : oThis,
-                aArgs.concat(args));
-        };
-
-    fNOP.prototype = this.prototype;
-    fBound.prototype = new fNOP();
-
-    return fBound;
-};
-
 jsb.urlRegExp = new RegExp("^(?:https?|ftp)://\\S*$", "i");
 
 cc._engineLoaded = false;
+
+var console = console || {}
+console.log = log;
 
 (function (config) {
     require("script/jsb.js");

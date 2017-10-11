@@ -1,7 +1,7 @@
 /****************************************************************************
  Copyright (c) 2012      greathqy
  Copyright (c) 2012      cocos2d-x.org
- Copyright (c) 2013-2016 Chukong Technologies Inc.
+ Copyright (c) 2013-2017 Chukong Technologies Inc.
 
  http://www.cocos2d-x.org
 
@@ -120,29 +120,33 @@ public:
      * Set the timeout value for connecting.
      *
      * @param value the timeout value for connecting.
+     * @deprecated Please use `HttpRequest.setTimeout` instead.
      */
-    void setTimeoutForConnect(int value);
+    CC_DEPRECATED_ATTRIBUTE void setTimeoutForConnect(int value);
 
     /**
      * Get the timeout value for connecting.
      *
      * @return int the timeout value for connecting.
+     * @deprecated Please use `HttpRequest.getTimeout` instead.
      */
-    int getTimeoutForConnect();
+    CC_DEPRECATED_ATTRIBUTE int getTimeoutForConnect();
 
     /**
      * Set the timeout value for reading.
      *
      * @param value the timeout value for reading.
+     * @deprecated Please use `HttpRequest.setTimeout` instead.
      */
-    void setTimeoutForRead(int value);
+    CC_DEPRECATED_ATTRIBUTE void setTimeoutForRead(int value);
 
     /**
      * Get the timeout value for reading.
      *
      * @return int the timeout value for reading.
+     * @deprecated Please use `HttpRequest.setTimeout` instead.
      */
-    int getTimeoutForRead();
+    CC_DEPRECATED_ATTRIBUTE int getTimeoutForRead();
 
     HttpCookie* getCookie() const {return _cookie; }
 
@@ -158,7 +162,7 @@ private:
      * Init pthread mutex, semaphore, and create new thread for http requests
      * @return bool
      */
-    bool lazyInitThreadSemphore();
+    bool lazyInitThreadSemaphore();
     void networkThread();
     void networkThreadAlone(HttpRequest* request, HttpResponse* response);
     /** Poll function called from main thread to dispatch callbacks when http requests finished **/

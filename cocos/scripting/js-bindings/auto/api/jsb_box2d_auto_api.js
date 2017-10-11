@@ -863,16 +863,6 @@ b2vec2
 },
 
 /**
- * @method GetJointList
-* @return {b2JointEdge|b2JointEdge}
-*/
-GetJointList : function(
-)
-{
-    return b2JointEdge;
-},
-
-/**
  * @method GetLinearVelocity
  * @return {b2Vec2}
  */
@@ -1901,16 +1891,6 @@ IsLocked : function (
 )
 {
     return false;
-},
-
-/**
- * @method GetContactList
-* @return {b2Contact|b2Contact}
-*/
-GetContactList : function(
-)
-{
-    return b2Contact;
 },
 
 /**

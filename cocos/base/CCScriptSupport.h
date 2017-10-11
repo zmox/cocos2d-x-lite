@@ -53,7 +53,7 @@ class CallFunc;
 class Acceleration;
 class Action;
 
-enum ccScriptType {
+enum ccScriptType : char{
     kScriptTypeNone = 0,
     kScriptTypeLua,
     kScriptTypeJavascript
@@ -801,7 +801,7 @@ public:
     
     /** Remove proxy for a native object
      */
-    virtual void removeObjectProxy(Ref* obj) {}
+    virtual void removeObjectProxy(void* obj) {}
 
     /** Triggers the garbage collector */
     virtual void garbageCollect() {}
