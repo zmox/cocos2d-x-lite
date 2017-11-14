@@ -111,7 +111,7 @@ Node::Node()
 , _realColor(Color3B::WHITE)
 , _cascadeColorEnabled(false)
 , _cascadeOpacityEnabled(false)
-, _cameraMask(1)
+, _cameraMask(0)
 {
     // set default scheduler and actionManager
     _director = Director::getInstance();
@@ -667,6 +667,17 @@ void Node::setGLProgramState(cocos2d::GLProgramState* glProgramState)
 {
     if (glProgramState != _glProgramState)
     {
+#if CC_ENABLE_GC_FOR_NATIVE_OBJECTS
+        auto sEngine = ScriptEngineManager::getInstance()->getScriptEngine();
+        if (sEngine)
+        {
+            if (glProgramState)
+                sEngine->retainScriptObject(this, glProgramState);
+            if (_glProgramState)
+                sEngine->releaseScriptObject(this, _glProgramState);
+        }
+#endif // CC_ENABLE_GC_FOR_NATIVE_OBJECTS
+
         CC_SAFE_RELEASE(_glProgramState);
         _glProgramState = glProgramState;
         CC_SAFE_RETAIN(_glProgramState);
@@ -1244,14 +1255,13 @@ void Node::visit(Renderer* renderer, const Mat4 &parentTransform, uint32_t paren
     auto camera = creator::CameraNode::getInstance();
     if (camera) {
         if (camera->visitingIndex <= 0) {
-            if (camera->containsNode(this)) {
+            if (_cameraMask > 0) {
                 camera->visitingIndex ++;
             }
         }
         else {
             camera->visitingIndex ++;
         }
-        
     }
     
     if(!_children.empty())
