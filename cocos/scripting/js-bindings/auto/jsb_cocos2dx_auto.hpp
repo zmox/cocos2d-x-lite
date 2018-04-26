@@ -2089,6 +2089,7 @@ SE_DECLARE_FUNC(js_cocos2dx_RenderTexture_beginWithClear);
 SE_DECLARE_FUNC(js_cocos2dx_RenderTexture_clearDepth);
 SE_DECLARE_FUNC(js_cocos2dx_RenderTexture_getClearColor);
 SE_DECLARE_FUNC(js_cocos2dx_RenderTexture_clear);
+SE_DECLARE_FUNC(js_cocos2dx_RenderTexture_saveToPath);
 SE_DECLARE_FUNC(js_cocos2dx_RenderTexture_getClearFlags);
 SE_DECLARE_FUNC(js_cocos2dx_RenderTexture_newImage);
 SE_DECLARE_FUNC(js_cocos2dx_RenderTexture_setClearDepth);

@@ -31678,6 +31678,87 @@ static bool js_cocos2dx_RenderTexture_clear(se::State& s)
 }
 SE_BIND_FUNC(js_cocos2dx_RenderTexture_clear)
 
+static bool js_cocos2dx_RenderTexture_saveToPath(se::State& s)
+{
+    cocos2d::RenderTexture* cobj = (cocos2d::RenderTexture*)s.nativeThisObject();
+    SE_PRECONDITION2(cobj, false, "js_cocos2dx_RenderTexture_saveToPath : Invalid Native Object");
+    const auto& args = s.args();
+    size_t argc = args.size();
+    CC_UNUSED bool ok = true;
+    if (argc == 2) {
+        std::string arg0;
+        cocos2d::Image::Format arg1;
+        ok &= seval_to_std_string(args[0], &arg0);
+        ok &= seval_to_int32(args[1], (int32_t*)&arg1);
+        SE_PRECONDITION2(ok, false, "js_cocos2dx_RenderTexture_saveToPath : Error processing arguments");
+        bool result = cobj->saveToPath(arg0, arg1);
+        ok &= boolean_to_seval(result, &s.rval());
+        SE_PRECONDITION2(ok, false, "js_cocos2dx_RenderTexture_saveToPath : Error processing arguments");
+        return true;
+    }
+    if (argc == 3) {
+        std::string arg0;
+        cocos2d::Image::Format arg1;
+        bool arg2;
+        ok &= seval_to_std_string(args[0], &arg0);
+        ok &= seval_to_int32(args[1], (int32_t*)&arg1);
+        ok &= seval_to_boolean(args[2], &arg2);
+        SE_PRECONDITION2(ok, false, "js_cocos2dx_RenderTexture_saveToPath : Error processing arguments");
+        bool result = cobj->saveToPath(arg0, arg1, arg2);
+        ok &= boolean_to_seval(result, &s.rval());
+        SE_PRECONDITION2(ok, false, "js_cocos2dx_RenderTexture_saveToPath : Error processing arguments");
+        return true;
+    }
+    if (argc == 4) {
+        std::string arg0;
+        cocos2d::Image::Format arg1;
+        bool arg2;
+        std::function<void (cocos2d::RenderTexture *, const std::basic_string<char> &)> arg3;
+        ok &= seval_to_std_string(args[0], &arg0);
+        ok &= seval_to_int32(args[1], (int32_t*)&arg1);
+        ok &= seval_to_boolean(args[2], &arg2);
+        do {
+            if (args[3].isObject() && args[3].toObject()->isFunction())
+            {
+                se::Value jsThis(s.thisObject());
+                se::Value jsFunc(args[3]);
+                jsThis.toObject()->attachObject(jsFunc.toObject());
+                auto lambda = [=](cocos2d::RenderTexture* larg0, const std::basic_string<char> & larg1) -> void {
+                    se::ScriptEngine::getInstance()->clearException();
+                    se::AutoHandleScope hs;
+        
+                    CC_UNUSED bool ok = true;
+                    se::ValueArray args;
+                    args.resize(2);
+                    ok &= native_ptr_to_seval<cocos2d::RenderTexture>((cocos2d::RenderTexture*)larg0, &args[0]);
+                    ok &= std_string_to_seval(larg1, &args[1]);
+                    se::Value rval;
+                    se::Object* thisObj = jsThis.isObject() ? jsThis.toObject() : nullptr;
+                    se::Object* funcObj = jsFunc.toObject();
+                    bool succeed = funcObj->call(args, thisObj, &rval);
+                    if (!succeed) {
+                        se::ScriptEngine::getInstance()->clearException();
+                    }
+                };
+                arg3 = lambda;
+            }
+            else
+            {
+                arg3 = nullptr;
+            }
+        } while(false)
+        ;
+        SE_PRECONDITION2(ok, false, "js_cocos2dx_RenderTexture_saveToPath : Error processing arguments");
+        bool result = cobj->saveToPath(arg0, arg1, arg2, arg3);
+        ok &= boolean_to_seval(result, &s.rval());
+        SE_PRECONDITION2(ok, false, "js_cocos2dx_RenderTexture_saveToPath : Error processing arguments");
+        return true;
+    }
+    SE_REPORT_ERROR("wrong number of arguments: %d, was expecting %d", (int)argc, 4);
+    return false;
+}
+SE_BIND_FUNC(js_cocos2dx_RenderTexture_saveToPath)
+
 static bool js_cocos2dx_RenderTexture_getClearFlags(se::State& s)
 {
     cocos2d::RenderTexture* cobj = (cocos2d::RenderTexture*)s.nativeThisObject();
@@ -31912,6 +31993,7 @@ bool js_register_cocos2dx_RenderTexture(se::Object* obj)
     cls->defineFunction("clearDepth", _SE(js_cocos2dx_RenderTexture_clearDepth));
     cls->defineFunction("getClearColor", _SE(js_cocos2dx_RenderTexture_getClearColor));
     cls->defineFunction("clear", _SE(js_cocos2dx_RenderTexture_clear));
+    cls->defineFunction("saveToPath", _SE(js_cocos2dx_RenderTexture_saveToPath));
     cls->defineFunction("getClearFlags", _SE(js_cocos2dx_RenderTexture_getClearFlags));
     cls->defineFunction("newImage", _SE(js_cocos2dx_RenderTexture_newImage));
     cls->defineFunction("setClearDepth", _SE(js_cocos2dx_RenderTexture_setClearDepth));

@@ -13886,6 +13886,24 @@ float
 },
 
 /**
+ * @method saveToPath
+ * @param {String} arg0
+ * @param {cc.Image::Format} arg1
+ * @param {bool} arg2
+ * @param {function} arg3
+ * @return {bool}
+ */
+saveToPath : function (
+str, 
+format, 
+bool, 
+func 
+)
+{
+    return false;
+},
+
+/**
  * @method getClearFlags
  * @return {unsigned int}
  */
