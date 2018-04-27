@@ -15953,14 +15953,14 @@ int
 
 /**
  * @method initWithXML
- * @param {String} arg0
- * @param {String} arg1
- * @param {map_object} arg2
- * @return {bool}
- */
-initWithXML : function (
-str, 
-str, 
+* @param {String|String} str
+* @param {map_object|String} map
+* @param {map_object|map_object} map
+* @return {bool|bool}
+*/
+initWithXML : function(
+str,
+str,
 map 
 )
 {
@@ -16211,14 +16211,14 @@ str
 
 /**
  * @method createWithXML
- * @param {String} arg0
- * @param {String} arg1
- * @param {map_object} arg2
- * @return {cc.TMXMapInfo}
- */
-createWithXML : function (
-str, 
-str, 
+* @param {String|String} str
+* @param {map_object|String} map
+* @param {map_object|map_object} map
+* @return {cc.TMXMapInfo|cc.TMXMapInfo}
+*/
+createWithXML : function(
+str,
+str,
 map 
 )
 {
@@ -16608,13 +16608,13 @@ getMapSize : function (
 /**
  * @method initWithXML
 * @param {String|String} str
-* @param {String|String} str
+* @param {map_object|String} map
 * @param {map_object} map
 * @return {bool|bool}
 */
 initWithXML : function(
 str,
-str,
+map,
 map 
 )
 {
