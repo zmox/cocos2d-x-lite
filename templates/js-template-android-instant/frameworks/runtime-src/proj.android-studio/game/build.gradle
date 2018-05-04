@@ -120,8 +120,6 @@ android.featureVariants.all { variant ->
 }
 
 dependencies {
-    api 'com.android.support:appcompat-v7:26.0.2'
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    application project(':dark_slash')
     implementation project(':libcocos2dx')
 }
