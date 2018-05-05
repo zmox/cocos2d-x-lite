@@ -8,6 +8,7 @@ android {
 
     defaultConfig {
         minSdkVersion PROP_TARGET_SDK_VERSION
+        manifestPlaceholders = [scheme:INSTANT_GAME_SCHEME,host:INSTANT_GAME_HOST,pathPattern:INSTANT_GAME_PATHPATTERN]
         targetSdkVersion 26
         versionCode 1
         versionName "1.0"

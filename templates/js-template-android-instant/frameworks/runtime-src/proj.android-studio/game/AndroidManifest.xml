@@ -30,9 +30,9 @@
                 <category android:name="android.intent.category.DEFAULT" />
 
                 <data
-                    android:host="org.cocos2dx.helloworld"
-                    android:pathPattern="/game"
-                    android:scheme="https" />
+                    android:host="${host}"
+                    android:pathPattern="${pathPattern}"
+                    android:scheme="${scheme}" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

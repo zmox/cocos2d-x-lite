@@ -41,6 +41,7 @@
       "files": [
         "frameworks/runtime-src/proj.android-studio/settings.gradle",
         "frameworks/runtime-src/proj.android-studio/app/res/values/strings.xml",
+        "frameworks/runtime-src/proj.android-studio/game/res/values/strings.xml",
         "frameworks/runtime-src/Classes/AppDelegate.cpp"
       ]
     },
