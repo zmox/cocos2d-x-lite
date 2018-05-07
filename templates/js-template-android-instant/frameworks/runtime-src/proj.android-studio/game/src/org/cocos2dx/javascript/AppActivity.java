@@ -24,14 +24,20 @@ THE SOFTWARE.
 ****************************************************************************/
 package org.cocos2dx.javascript;
 
+import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.net.Uri;
 import android.os.Bundle;
+
+import com.google.android.instantapps.InstantApps;
 
 import org.cocos2dx.lib.Cocos2dxActivity;
 import org.cocos2dx.lib.Cocos2dxGLSurfaceView;
 
 public class AppActivity extends Cocos2dxActivity {
+    private static Activity mActivity = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,10 +51,10 @@ public class AppActivity extends Cocos2dxActivity {
             return;
         }
         // DO OTHER INITIALIZATION BELOW
-        
+        mActivity = this;
         SDKWrapper.getInstance().init(this);
     }
-	
+
     @Override
     public Cocos2dxGLSurfaceView onCreateView() {
         Cocos2dxGLSurfaceView glSurfaceView = new Cocos2dxGLSurfaceView(this);
@@ -101,7 +107,7 @@ public class AppActivity extends Cocos2dxActivity {
         super.onStop();
         SDKWrapper.getInstance().onStop();
     }
-        
+
     @Override
     public void onBackPressed() {
         SDKWrapper.getInstance().onBackPressed();
@@ -131,4 +137,11 @@ public class AppActivity extends Cocos2dxActivity {
         SDKWrapper.getInstance().onStart();
         super.onStart();
     }
+
+    public static void showInstallPrompt() {
+            Uri a = mActivity.getIntent().getData();
+            Intent postInstallIntent = new Intent(Intent.ACTION_VIEW, a);
+            postInstallIntent.addCategory(Intent.CATEGORY_BROWSABLE);
+            InstantApps.showInstallPrompt(mActivity, postInstallIntent, 0, "AppActivity");
+        }
 }
