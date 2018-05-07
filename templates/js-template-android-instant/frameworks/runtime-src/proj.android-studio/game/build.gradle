@@ -122,5 +122,6 @@ android.featureVariants.all { variant ->
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation 'com.google.android.instantapps:instantapps:1.1.0'
     implementation project(':libcocos2dx')
 }
