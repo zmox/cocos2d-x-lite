@@ -308,7 +308,7 @@ namespace se {
     bool Object::defineFunction(const char *funcName, JSNative func)
     {
         JS::RootedObject object(__cx, _getJSObject());
-        bool ok = JS_DefineFunction(__cx, object, funcName, func, 0, 0);
+        bool ok = JS_DefineFunction(__cx, object, funcName, func, 0, JSPROP_ENUMERATE | JSPROP_PERMANENT);
         return ok;
     }
 
@@ -487,12 +487,12 @@ namespace se {
         _privateData = data;
     }
 
-    void Object::clearPrivateData()
+    void Object::clearPrivateData(bool clearMapping)
     {
         if (_privateData != nullptr)
         {
-            void* data = getPrivateData();
-            NativePtrToObjectMap::erase(data);
+            if (clearMapping)
+                NativePtrToObjectMap::erase(_privateData);
             JS::RootedObject obj(__cx, _getJSObject());
             internal::clearPrivate(__cx, obj);
             _privateData = nullptr;
