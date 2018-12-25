@@ -1,5 +1,6 @@
 /****************************************************************************
 Copyright (c) 2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -31,7 +32,7 @@ THE SOFTWARE.
 
 #include <algorithm>
 
-namespace cocos2d { namespace experimental {
+namespace cocos2d { 
 
 AudioMixerController::AudioMixerController(int bufferSizeInFrames, int sampleRate, int channelCount)
         : _bufferSizeInFrames(bufferSizeInFrames)
@@ -346,4 +347,4 @@ bool AudioMixerController::hasPlayingTacks()
     return false;
 }
 
-}} // namespace cocos2d { namespace experimental {
+} // namespace cocos2d { 

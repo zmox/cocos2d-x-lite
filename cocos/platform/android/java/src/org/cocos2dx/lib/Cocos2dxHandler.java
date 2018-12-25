@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2013 cocos2d-x.org
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -81,7 +82,7 @@ public class Cocos2dxHandler extends Handler {
 
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        // TODO Auto-generated method stub
+                        // REFINE: Auto-generated method stub
 
                     }
                 }).create().show();

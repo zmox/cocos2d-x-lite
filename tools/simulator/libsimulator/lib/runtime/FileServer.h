@@ -1,5 +1,7 @@
 /****************************************************************************
 Copyright (c) 2013 cocos2d-x.org
+Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -25,7 +27,6 @@ THE SOFTWARE.
 #ifndef  _FILE_SERVER__H_
 #define  _FILE_SERVER__H_
 
-#include "cocos2d.h"
 #include "json/document.h"
 #include "json/filereadstream.h"
 #include "json/stringbuffer.h"
@@ -39,7 +40,9 @@ THE SOFTWARE.
 #include <io.h>
 #include <WS2tcpip.h>
 
+#ifndef bzero
 #define bzero(a, b) memset(a, 0, b);
+#endif
 
 #else
 #include <netdb.h>
@@ -53,6 +56,10 @@ THE SOFTWARE.
 #else
 #include <unistd.h>
 #endif
+
+#include <thread>
+#include <list>
+#include <mutex>
 
 class CC_LIBSIM_DLL FileServer
 {

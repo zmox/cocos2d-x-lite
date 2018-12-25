@@ -1,21 +1,17 @@
+#pragma once
 #include "base/ccConfig.h"
-#ifndef __cocos2dx_network_h__
-#define __cocos2dx_network_h__
+#if (USE_NET_WORK > 0) && (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID || CC_TARGET_PLATFORM == CC_PLATFORM_IOS || CC_TARGET_PLATFORM == CC_PLATFORM_MAC || CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
 
-#include "jsapi.h"
-#include "jsfriendapi.h"
+#include "cocos/scripting/js-bindings/jswrapper/SeApi.h"
 
-extern JSClass  *jsb_cocos2d_network_Downloader_class;
-extern JSObject *jsb_cocos2d_network_Downloader_prototype;
+extern se::Object* __jsb_cocos2d_network_Downloader_proto;
+extern se::Class* __jsb_cocos2d_network_Downloader_class;
 
-bool js_cocos2dx_network_Downloader_constructor(JSContext *cx, uint32_t argc, jsval *vp);
-void js_cocos2dx_network_Downloader_finalize(JSContext *cx, JSObject *obj);
-void js_register_cocos2dx_network_Downloader(JSContext *cx, JS::HandleObject global);
-void register_all_cocos2dx_network(JSContext* cx, JS::HandleObject obj);
-bool js_cocos2dx_network_Downloader_setOnTaskError(JSContext *cx, uint32_t argc, jsval *vp);
-bool js_cocos2dx_network_Downloader_setOnTaskProgress(JSContext *cx, uint32_t argc, jsval *vp);
-bool js_cocos2dx_network_Downloader_createDownloadFileTask(JSContext *cx, uint32_t argc, jsval *vp);
-bool js_cocos2dx_network_Downloader_setOnFileTaskSuccess(JSContext *cx, uint32_t argc, jsval *vp);
-bool js_cocos2dx_network_Downloader_Downloader(JSContext *cx, uint32_t argc, jsval *vp);
+bool js_register_cocos2d_network_Downloader(se::Object* obj);
+bool register_all_network(se::Object* obj);
+SE_DECLARE_FUNC(js_network_Downloader_setOnTaskError);
+SE_DECLARE_FUNC(js_network_Downloader_setOnTaskProgress);
+SE_DECLARE_FUNC(js_network_Downloader_setOnFileTaskSuccess);
+SE_DECLARE_FUNC(js_network_Downloader_Downloader);
 
-#endif // __cocos2dx_network_h__
+#endif //#if (USE_NET_WORK > 0) && (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID || CC_TARGET_PLATFORM == CC_PLATFORM_IOS || CC_TARGET_PLATFORM == CC_PLATFORM_MAC || CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)

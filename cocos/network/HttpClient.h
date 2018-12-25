@@ -2,6 +2,7 @@
  Copyright (c) 2012      greathqy
  Copyright (c) 2012      cocos2d-x.org
  Copyright (c) 2013-2016 Chukong Technologies Inc.
+ Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos2d-x.org
 
@@ -30,10 +31,10 @@
 #include <thread>
 #include <condition_variable>
 #include "base/CCVector.h"
-#include "base/CCScheduler.h"
 #include "network/HttpRequest.h"
 #include "network/HttpResponse.h"
 #include "network/HttpCookie.h"
+#include "base/CCScheduler.h"
 
 /**
  * @addtogroup network
@@ -120,29 +121,33 @@ public:
      * Set the timeout value for connecting.
      *
      * @param value the timeout value for connecting.
+     * @deprecated Please use `HttpRequest.setTimeout` instead.
      */
-    void setTimeoutForConnect(int value);
+    CC_DEPRECATED_ATTRIBUTE void setTimeoutForConnect(int value);
 
     /**
      * Get the timeout value for connecting.
      *
      * @return int the timeout value for connecting.
+     * @deprecated Please use `HttpRequest.getTimeout` instead.
      */
-    int getTimeoutForConnect();
+    CC_DEPRECATED_ATTRIBUTE int getTimeoutForConnect();
 
     /**
      * Set the timeout value for reading.
      *
      * @param value the timeout value for reading.
+     * @deprecated Please use `HttpRequest.setTimeout` instead.
      */
-    void setTimeoutForRead(int value);
+    CC_DEPRECATED_ATTRIBUTE void setTimeoutForRead(int value);
 
     /**
      * Get the timeout value for reading.
      *
      * @return int the timeout value for reading.
+     * @deprecated Please use `HttpRequest.setTimeout` instead.
      */
-    int getTimeoutForRead();
+    CC_DEPRECATED_ATTRIBUTE int getTimeoutForRead();
 
     HttpCookie* getCookie() const {return _cookie; }
 
@@ -158,7 +163,7 @@ private:
      * Init pthread mutex, semaphore, and create new thread for http requests
      * @return bool
      */
-    bool lazyInitThreadSemphore();
+    bool lazyInitThreadSemaphore();
     void networkThread();
     void networkThreadAlone(HttpRequest* request, HttpResponse* response);
     /** Poll function called from main thread to dispatch callbacks when http requests finished **/

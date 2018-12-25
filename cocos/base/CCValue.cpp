@@ -1,5 +1,6 @@
 /****************************************************************************
- Copyright (c) 2013-2016 Chukong Technologies
+ Copyright (c) 2013-2016 Chukong Technologies Inc.
+ Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos2d-x.org
 
@@ -23,10 +24,15 @@
 ****************************************************************************/
 
 #include "base/CCValue.h"
+#include "base/ccUtils.h"
+
 #include <cmath>
 #include <sstream>
 #include <iomanip>
-#include "base/ccUtils.h"
+#include <float.h>
+#include <stdlib.h>
+#include <memory.h>
+
 
 NS_CC_BEGIN
 

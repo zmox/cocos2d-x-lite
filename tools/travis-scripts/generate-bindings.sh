@@ -38,40 +38,31 @@ generate_bindings_glue_codes()
     popd
 }
 
-generate_bindings_glue_codes
-
 pushd "$PROJECT_ROOT"
 #Set git user for cocos2d-js repo
 git config user.email ${GH_EMAIL}
 git config user.name ${GH_USER}
 popd
 
-#backup the chipmunk js bindings
-backup_dir="$JS_AUTO_GENERATED_DIR"/../backup
-echo $backup_dir
-mkdir -p $backup_dir
-cp "$JS_AUTO_GENERATED_DIR"/js_bindings_chipmunk_auto_classes.cpp "$backup_dir"/
-cp "$JS_AUTO_GENERATED_DIR"/js_bindings_chipmunk_auto_classes.h "$backup_dir"/
-cp "$JS_AUTO_GENERATED_DIR"/js_bindings_chipmunk_auto_classes_registration.h "$backup_dir"/
-cp "$JS_AUTO_GENERATED_DIR"/js_bindings_chipmunk_functions.cpp "$backup_dir"/
-cp "$JS_AUTO_GENERATED_DIR"/js_bindings_chipmunk_functions.h "$backup_dir"/
-cp "$JS_AUTO_GENERATED_DIR"/js_bindings_chipmunk_functions_registration.h "$backup_dir"/
-
-rm -rf "$JS_AUTO_GENERATED_DIR"
-mkdir "$JS_AUTO_GENERATED_DIR"
-
-cp "$backup_dir"/js_bindings_chipmunk_auto_classes.cpp "$JS_AUTO_GENERATED_DIR"/
-cp "$backup_dir"/js_bindings_chipmunk_auto_classes.h "$JS_AUTO_GENERATED_DIR"/
-cp "$backup_dir"/js_bindings_chipmunk_auto_classes_registration.h "$JS_AUTO_GENERATED_DIR"/
-cp "$backup_dir"/js_bindings_chipmunk_functions.cpp "$JS_AUTO_GENERATED_DIR"/
-cp "$backup_dir"/js_bindings_chipmunk_functions.h "$JS_AUTO_GENERATED_DIR"/
-cp "$backup_dir"/js_bindings_chipmunk_functions_registration.h "$JS_AUTO_GENERATED_DIR"/
-#move the backup chipmunk js bindings to js auto directory
-
-rm -rf $backup_dir
-
 # 1. Generate js bindings
 generate_bindings_glue_codes
+
+if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+  exit 0
+fi
+
+if [ -z "${GH_EMAIL}" ]; then
+  echo "GH_EMAIL not set"
+  exit 1
+fi
+if [ -z "${GH_USER}" ]; then
+  echo "GH_USER not set"
+  exit 1
+fi
+if [ -z "${GH_PASSWORD}" ]; then
+  echo "GH_USER not set"
+  exit 1
+fi
 
 echo
 echo Bindings generated successfully
@@ -127,7 +118,8 @@ git commit -m "$COMMITTAG"
 git remote add upstream "$COCOS_ROBOT_REMOTE" 2> /dev/null > /dev/null
 
 echo "Pushing to Robot's repo ..."
-git push -fq upstream "$COCOS_BRANCH" 2> /dev/null
+# git push -fq upstream "$COCOS_BRANCH" 2> /dev/null
+git push -fq upstream "$COCOS_BRANCH"
 
 # 7.
 echo "Sending Pull Request to base repo ..."

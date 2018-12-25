@@ -1,5 +1,6 @@
 /****************************************************************************
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -107,6 +108,45 @@ public class Cocos2dxLocalStorage {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public static String getKey(int nIndex) {
+        String ret = null;
+        try {
+            int nCount = 0;
+            String sql = "select key from "+TABLE_NAME + " order by rowid asc";
+            Cursor c = mDatabase.rawQuery(sql, null);
+            if(nIndex < 0 || nIndex >= c.getCount()) {
+                return null;
+            }
+
+            while (c.moveToNext()) {
+                if(nCount == nIndex) {
+                    ret = c.getString(c.getColumnIndex("key"));
+                    break;
+                }
+                nCount++;
+            }
+            c.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return ret;
+    }
+
+    public  static int getLength() {
+        int res = 0;
+        try {
+            String sql = "select count(*) as nums from "+TABLE_NAME;
+            Cursor c = mDatabase.rawQuery(sql, null);
+            if (c.moveToNext()){
+                res = c.getInt(c.getColumnIndex("nums"));
+            }
+            c.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return res;
     }
 
     /**

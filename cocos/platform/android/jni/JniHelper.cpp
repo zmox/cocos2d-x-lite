@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2012 cocos2d-x.org
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -288,7 +289,10 @@ namespace cocos2d {
     }
 
     jstring JniHelper::convert(cocos2d::JniMethodInfo& t, const char* x) {
-        jstring ret = cocos2d::StringUtils::newStringUTFJNI(t.env, x ? x : "");
+        jstring ret = nullptr;
+        if (x)
+          ret = cocos2d::StringUtils::newStringUTFJNI(t.env, x);
+
         localRefs[t.env].push_back(ret);
         return ret;
     }

@@ -26,17 +26,17 @@
  * SUCH DAMAGE.
  */
 
+#define LOG_TAG "mp3reader"
+
 #include <stdlib.h>
 #include <assert.h>
 #include <stdint.h>
-#include <string>
+#include <string.h> // Resolves that memset, memcpy aren't found while APP_PLATFORM >= 22 on Android
 #include <vector>
 #include "audio/android/cutils/log.h"
 
 #include "pvmp3decoder_api.h"
-#include "mp3reader.h"
-
-using namespace std;
+#include "audio/android/mp3reader.h"
 
 static uint32_t U32_AT(const uint8_t *ptr) {
     return ptr[0] << 24 | ptr[1] << 16 | ptr[2] << 8 | ptr[3];
@@ -239,6 +239,9 @@ static bool resync(
             len += 10;
 
             *inout_pos += len;
+
+            ALOGV("skipped ID3 tag, new starting offset is %lld (0x%016llx)",
+                    (long long)*inout_pos, (long long)*inout_pos);
         }
 
     }
@@ -256,8 +259,9 @@ static bool resync(
     uint8_t *tmp = buf;
 
     do {
-        if (pos >= *inout_pos + kMaxBytesChecked) {
+        if (pos >= (off64_t)(*inout_pos + kMaxBytesChecked)) {
             // Don't scan forever.
+            ALOGV("giving up at offset %lld", (long long)pos);
             break;
         }
 
@@ -306,6 +310,7 @@ static bool resync(
             continue;
         }
 
+        // ALOGV("found possible 1st frame at %lld (header = 0x%08x)", (long long)pos, header);
         // We found what looks like a valid frame,
         // now find its successors.
 
@@ -323,6 +328,8 @@ static bool resync(
 
             uint32_t test_header = U32_AT(tmp);
 
+            ALOGV("subsequent header is %08x", test_header);
+
             if ((test_header & kMask) != (header & kMask)) {
                 valid = false;
                 break;
@@ -334,6 +341,7 @@ static bool resync(
                 break;
             }
 
+            ALOGV("found subsequent frame #%d at %lld", j + 2, (long long)test_pos);
             test_pos += test_frame_size;
         }
 
@@ -343,6 +351,8 @@ static bool resync(
             if (out_header != NULL) {
                 *out_header = header;
             }
+        } else {
+            ALOGV("no dice, no valid sequence of frames found.");
         }
 
         ++pos;
@@ -369,7 +379,11 @@ bool Mp3Reader::init(mp3_callbacks *callback, void* source) {
     off64_t pos = 0;
     uint32_t header;
     bool success = resync(callback, source, 0 /*match_header*/, &pos, &header);
-    if (success == false) return false;
+    if (!success)
+    {
+        ALOGE("%s, resync failed", __FUNCTION__);
+        return false;
+    }
 
     mCurrentPos  = pos;
     mFixedHeader = header;
@@ -455,7 +469,7 @@ int decodeMP3(mp3_callbacks* cb, void* source, std::vector<char>& pcmBuffer, int
     Mp3Reader mp3Reader;
     bool success = mp3Reader.init(cb, source);
     if (!success) {
-        fprintf(stderr, "Encountered error reading\n");
+        ALOGE("mp3Reader.init: Encountered error reading\n");
         free(decoderBuf);
         return EXIT_FAILURE;
     }
@@ -468,7 +482,7 @@ int decodeMP3(mp3_callbacks* cb, void* source, std::vector<char>& pcmBuffer, int
     // sfInfo.samplerate = mp3Reader.getSampleRate();
     // SNDFILE *handle = sf_open(argv[2], SFM_WRITE, &sfInfo);
     // if (handle == NULL) {
-    //     fprintf(stderr, "Encountered error writing %s\n", argv[2]);
+    //     ALOGE("Encountered error writing %s\n", argv[2]);
     //     mp3Reader.close();
     //     free(decoderBuf);
     //     return EXIT_FAILURE;
@@ -504,7 +518,7 @@ int decodeMP3(mp3_callbacks* cb, void* source, std::vector<char>& pcmBuffer, int
         ERROR_CODE decoderErr;
         decoderErr = pvmp3_framedecoder(&config, decoderBuf);
         if (decoderErr != NO_DECODING_ERROR) {
-            fprintf(stderr, "Decoder encountered error\n");
+            ALOGE("Decoder encountered error=%d", decoderErr);
             retVal = EXIT_FAILURE;
             break;
         }

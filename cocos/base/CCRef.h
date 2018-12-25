@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2012 cocos2d-x.org
-Copyright (c) 2013-2016 Chukong Technologies
+Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -26,7 +27,7 @@ THE SOFTWARE.
 #ifndef __BASE_CCREF_H__
 #define __BASE_CCREF_H__
 
-#include "platform/CCPlatformMacros.h"
+#include "base/ccMacros.h"
 #include "base/ccConfig.h"
 
 #define CC_REF_LEAK_DETECTION 0
@@ -123,7 +124,6 @@ protected:
      */
     Ref();
 
-public:
     /**
      * Destructor
      *
@@ -138,50 +138,12 @@ protected:
 
     friend class AutoreleasePool;
 
-#if CC_ENABLE_SCRIPT_BINDING
-public:
-    /// object id, ScriptSupport need public _ID
-    unsigned int        _ID;
-    /// Lua reference id
-    int                 _luaID;
-    
-    /**
-     When true, it means that the object was already rooted.
-     */
-    bool _rooted;
-#endif
-
     // Memory leak diagnostic data (only included when CC_REF_LEAK_DETECTION is defined and its value isn't zero)
 #if CC_REF_LEAK_DETECTION
 public:
     static void printLeaks();
 #endif
 };
-
-class Node;
-
-typedef void (Ref::*SEL_CallFunc)();
-typedef void (Ref::*SEL_CallFuncN)(Node*);
-typedef void (Ref::*SEL_CallFuncND)(Node*, void*);
-typedef void (Ref::*SEL_CallFuncO)(Ref*);
-typedef void (Ref::*SEL_MenuHandler)(Ref*);
-typedef void (Ref::*SEL_SCHEDULE)(float);
-
-#define CC_CALLFUNC_SELECTOR(_SELECTOR) static_cast<cocos2d::SEL_CallFunc>(&_SELECTOR)
-#define CC_CALLFUNCN_SELECTOR(_SELECTOR) static_cast<cocos2d::SEL_CallFuncN>(&_SELECTOR)
-#define CC_CALLFUNCND_SELECTOR(_SELECTOR) static_cast<cocos2d::SEL_CallFuncND>(&_SELECTOR)
-#define CC_CALLFUNCO_SELECTOR(_SELECTOR) static_cast<cocos2d::SEL_CallFuncO>(&_SELECTOR)
-#define CC_MENU_SELECTOR(_SELECTOR) static_cast<cocos2d::SEL_MenuHandler>(&_SELECTOR)
-#define CC_SCHEDULE_SELECTOR(_SELECTOR) static_cast<cocos2d::SEL_SCHEDULE>(&_SELECTOR)
-
-// Deprecated
-#define callfunc_selector(_SELECTOR) CC_CALLFUNC_SELECTOR(_SELECTOR)
-#define callfuncN_selector(_SELECTOR) CC_CALLFUNCN_SELECTOR(_SELECTOR)
-#define callfuncND_selector(_SELECTOR) CC_CALLFUNCND_SELECTOR(_SELECTOR)
-#define callfuncO_selector(_SELECTOR) CC_CALLFUNCO_SELECTOR(_SELECTOR)
-#define menu_selector(_SELECTOR) CC_MENU_SELECTOR(_SELECTOR)
-#define schedule_selector(_SELECTOR) CC_SCHEDULE_SELECTOR(_SELECTOR)
-
 
 
 NS_CC_END

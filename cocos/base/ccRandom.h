@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2012 cocos2d-x.org
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -29,7 +30,7 @@ THE SOFTWARE.
 #include <random>
 #include <cstdlib>
 
-#include "platform/CCPlatformMacros.h"
+#include "base/ccMacros.h"
 
 /**
 * @addtogroup base
@@ -96,7 +97,7 @@ inline int random() {
  * It can be seeded using std::srand(seed);
  */
 inline float rand_minus1_1() {
-    // FIXME: using the new c++11 random engine generator
+    // IDEA: using the new c++11 random engine generator
     // without a proper way to set a seed is not useful.
     // Resorting to the old random method since it can
     // be seeded using std::srand()
@@ -110,7 +111,7 @@ inline float rand_minus1_1() {
  * It can be seeded using std::srand(seed);
  */
 inline float rand_0_1() {
-    // FIXME: using the new c++11 random engine generator
+    // IDEA: using the new c++11 random engine generator
     // without a proper way to set a seed is not useful.
     // Resorting to the old random method since it can
     // be seeded using std::srand()

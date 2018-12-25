@@ -1,5 +1,6 @@
 /****************************************************************************
- Copyright (c) 2014 Chukong Technologies Inc.
+ Copyright (c) 2014-2016 Chukong Technologies Inc.
+ Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
  
  http://www.cocos2d-x.org
  
@@ -25,8 +26,8 @@
 #ifndef __cocos2d_libs__CCEventAssetsManagerEx__
 #define __cocos2d_libs__CCEventAssetsManagerEx__
 
-#include "base/CCEvent.h"
-#include "base/CCEventCustom.h"
+#include <string>
+#include "base/CCRef.h"
 #include "extensions/ExtensionMacros.h" 
 #include "extensions/ExtensionExport.h"
 
@@ -34,12 +35,9 @@ NS_CC_EXT_BEGIN
 
 class AssetsManagerEx;
 
-class CC_EX_DLL EventAssetsManagerEx : public cocos2d::EventCustom
+class CC_EX_DLL EventAssetsManagerEx : public cocos2d::Ref
 {
 public:
-    
-    friend class AssetsManagerEx;
-    
     //! Update events code
     enum class EventCode
     {
@@ -68,15 +66,27 @@ public:
     
     inline cocos2d::extension::AssetsManagerEx *getAssetsManagerEx() const { return _manager; };
     
-    inline float getPercent() const { return _percent; };
+    bool isResuming() const;
     
-    inline float getPercentByFile() const { return _percentByFile; };
+    float getPercent() const;
     
-CC_CONSTRUCTOR_ACCESS:
+    float getPercentByFile() const;
+    
+    double getDownloadedBytes() const;
+    
+    double getTotalBytes() const;
+    
+    int getDownloadedFiles() const;
+    
+    int getTotalFiles() const;
+    
+public:
     /** Constructor */
-    EventAssetsManagerEx(const std::string& eventName, cocos2d::extension::AssetsManagerEx *manager, const EventCode &code, float percent = 0, float percentByFile = 0, const std::string& assetId = "", const std::string& message = "", int curle_code = 0, int curlm_code = 0);
+    EventAssetsManagerEx(const std::string& eventName, cocos2d::extension::AssetsManagerEx *manager, const EventCode &code, const std::string& assetId = "", const std::string& message = "", int curle_code = 0, int curlm_code = 0);
     
 private:
+    virtual ~EventAssetsManagerEx() {}
+
     EventCode _code;
     
     cocos2d::extension::AssetsManagerEx *_manager;
@@ -88,10 +98,6 @@ private:
     int _curle_code;
     
     int _curlm_code;
-    
-    float _percent;
-    
-    float _percentByFile;
 };
 
 NS_CC_EXT_END

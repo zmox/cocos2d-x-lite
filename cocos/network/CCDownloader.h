@@ -1,5 +1,7 @@
 /****************************************************************************
  Copyright (c) 2015-2016 cocos2d-x.org
+ Copyright (c) 2013-2016 Chukong Technologies Inc.
+ Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos2d-x.org
 
@@ -25,11 +27,12 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <string>
 #include <memory>
 #include <vector>
 
-#include "platform/CCPlatformMacros.h"
+#include "base/ccMacros.h"
 
 namespace cocos2d { namespace network {
 
@@ -44,10 +47,12 @@ namespace cocos2d { namespace network {
         const static int ERROR_INVALID_PARAMS = -1;
         const static int ERROR_FILE_OP_FAILED = -2;
         const static int ERROR_IMPL_INTERNAL = -3;
+        const static int ERROR_ABORT = -4;
 
         std::string identifier;
         std::string requestURL;
         std::string storagePath;
+        std::map<std::string, std::string> header;
 
         DownloadTask();
         virtual ~DownloadTask();
@@ -102,6 +107,10 @@ namespace cocos2d { namespace network {
         std::shared_ptr<const DownloadTask> createDownloadDataTask(const std::string& srcUrl, const std::string& identifier = "");
 
         std::shared_ptr<const DownloadTask> createDownloadFileTask(const std::string& srcUrl, const std::string& storagePath, const std::string& identifier = "");
+
+        std::shared_ptr<const DownloadTask> createDownloadFileTask(const std::string& srcUrl, const std::string& storagePath, const std::map<std::string, std::string>& header, const std::string& identifier = "");
+
+        void abort(const DownloadTask& task);
 
     private:
         std::unique_ptr<IDownloaderImpl> _impl;

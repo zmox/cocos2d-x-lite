@@ -1,5 +1,6 @@
 /****************************************************************************
- Copyright (c) 2014 Chukong Technologies Inc.
+ Copyright (c) 2014-2016 Chukong Technologies Inc.
+ Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
  
  http://www.cocos2d-x.org
  
@@ -29,17 +30,49 @@
 
 NS_CC_EXT_BEGIN
 
-EventAssetsManagerEx::EventAssetsManagerEx(const std::string& eventName, cocos2d::extension::AssetsManagerEx *manager, const EventCode &code, float percent/* = 0 */, float percentByFile/* = 0*/, const std::string& assetId/* = "" */, const std::string& message/* = "" */, int curle_code/* = CURLE_OK*/, int curlm_code/* = CURLM_OK*/)
-: EventCustom(eventName)
-, _code(code)
+EventAssetsManagerEx::EventAssetsManagerEx(const std::string& eventName, cocos2d::extension::AssetsManagerEx *manager, const EventCode &code, const std::string& assetId/* = "" */, const std::string& message/* = "" */, int curle_code/* = CURLE_OK*/, int curlm_code/* = CURLM_OK*/)
+: _code(code)
 , _manager(manager)
 , _message(message)
 , _assetId(assetId)
 , _curle_code(curle_code)
 , _curlm_code(curlm_code)
-, _percent(percent)
-, _percentByFile(percentByFile)
 {
+}
+
+bool EventAssetsManagerEx::isResuming() const
+{
+    return _manager->isResuming();
+}
+
+float EventAssetsManagerEx::getPercent() const
+{
+    return _manager->getDownloadedBytes() / _manager->getTotalBytes();
+}
+
+float EventAssetsManagerEx::getPercentByFile() const
+{
+    return (float)(_manager->getDownloadedFiles()) / _manager->getTotalFiles();
+}
+
+double EventAssetsManagerEx::getDownloadedBytes() const
+{
+    return _manager->getDownloadedBytes();
+}
+
+double EventAssetsManagerEx::getTotalBytes() const
+{
+    return _manager->getTotalBytes();
+}
+
+int EventAssetsManagerEx::getDownloadedFiles() const
+{
+    return _manager->getDownloadedFiles();
+}
+
+int EventAssetsManagerEx::getTotalFiles() const
+{
+    return _manager->getTotalFiles();
 }
 
 

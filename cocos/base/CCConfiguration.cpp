@@ -26,13 +26,11 @@ THE SOFTWARE.
 
 #include "base/CCConfiguration.h"
 #include "platform/CCFileUtils.h"
-#include "base/CCEventCustom.h"
-#include "base/CCDirector.h"
-#include "base/CCEventDispatcher.h"
+#include "base/CCLog.h"
 
 NS_CC_BEGIN
 
-extern const char* cocos2dVersion();
+//cjh extern const char* cocos2dVersion();
 
 Configuration* Configuration::s_sharedConfiguration = nullptr;
 
@@ -43,8 +41,8 @@ Configuration::Configuration()
 , _maxModelviewStackDepth(0)
 , _supportsPVRTC(false)
 , _supportsETC1(false)
-//, _supportsS3TC(false)
-//, _supportsATITC(false)
+, _supportsS3TC(false)
+, _supportsATITC(false)
 , _supportsNPOT(false)
 , _supportsBGRA8888(false)
 , _supportsDiscardFramebuffer(false)
@@ -59,30 +57,28 @@ Configuration::Configuration()
 , _maxPointLightInShader(1)
 , _maxSpotLightInShader(1)
 {
-    _loadedEvent = new (std::nothrow) EventCustom(CONFIG_FILE_LOADED);
 }
 
 bool Configuration::init()
 {
-    _valueDict["cocos2d.x.version"] = Value(cocos2dVersion());
-
+    gatherGPUInfo();
 
 #if CC_ENABLE_PROFILERS
-    _valueDict["cocos2d.x.compiled_with_profiler"] = Value(true);
+    _valueDict["compiled_with_profiler"] = Value(true);
 #else
-    _valueDict["cocos2d.x.compiled_with_profiler"] = Value(false);
+    _valueDict["compiled_with_profiler"] = Value(false);
 #endif
 
 #if CC_ENABLE_GL_STATE_CACHE == 0
-    _valueDict["cocos2d.x.compiled_with_gl_state_cache"] = Value(false);
+    _valueDict["compiled_with_gl_state_cache"] = Value(false);
 #else
-    _valueDict["cocos2d.x.compiled_with_gl_state_cache"] = Value(true);
+    _valueDict["compiled_with_gl_state_cache"] = Value(true);
 #endif
 
 #if COCOS2D_DEBUG
-    _valueDict["cocos2d.x.build_type"] = Value("DEBUG");
+    _valueDict["build_type"] = Value("DEBUG");
 #else
-    _valueDict["cocos2d.x.build_type"] = Value("RELEASE");
+    _valueDict["build_type"] = Value("RELEASE");
 #endif
 
     return true;
@@ -90,18 +86,17 @@ bool Configuration::init()
 
 Configuration::~Configuration()
 {
-    CC_SAFE_DELETE(_loadedEvent);
 }
 
 std::string Configuration::getInfo() const
 {
     // And Dump some warnings as well
 #if CC_ENABLE_PROFILERS
-    CCLOG("cocos2d: **** WARNING **** CC_ENABLE_PROFILERS is defined. Disable it when you finish profiling (from ccConfig.h)\n");
+    CCLOG("**** WARNING **** CC_ENABLE_PROFILERS is defined. Disable it when you finish profiling (from ccConfig.h)\n");
 #endif
 
 #if CC_ENABLE_GL_STATE_CACHE == 0
-    CCLOG("cocos2d: **** WARNING **** CC_ENABLE_GL_STATE_CACHE is disabled. To improve performance, enable it (from ccConfig.h)\n");
+    CCLOG("**** WARNING **** CC_ENABLE_GL_STATE_CACHE is disabled. To improve performance, enable it (from ccConfig.h)\n");
 #endif
 
     // Dump
@@ -131,11 +126,11 @@ void Configuration::gatherGPUInfo()
     _supportsETC1 = checkForGLExtension("GL_OES_compressed_ETC1_RGB8_texture");
     _valueDict["gl.supports_ETC1"] = Value(_supportsETC1);
 
-//    _supportsS3TC = checkForGLExtension("GL_EXT_texture_compression_s3tc");
-//    _valueDict["gl.supports_S3TC"] = Value(_supportsS3TC);
-//
-//    _supportsATITC = checkForGLExtension("GL_AMD_compressed_ATC_texture");
-//    _valueDict["gl.supports_ATITC"] = Value(_supportsATITC);
+    _supportsS3TC = checkForGLExtension("GL_EXT_texture_compression_s3tc");
+    _valueDict["gl.supports_S3TC"] = Value(_supportsS3TC);
+
+    _supportsATITC = checkForGLExtension("GL_AMD_compressed_ATC_texture");
+    _valueDict["gl.supports_ATITC"] = Value(_supportsATITC);
 
     _supportsPVRTC = checkForGLExtension("GL_IMG_texture_compression_pvrtc");
     _valueDict["gl.supports_PVRTC"] = Value(_supportsPVRTC);
@@ -224,19 +219,19 @@ bool Configuration::supportsETC() const
 #endif
 }
 
-//bool Configuration::supportsS3TC() const
-//{
-//#ifdef GL_EXT_texture_compression_s3tc
-//    return _supportsS3TC;
-//#else
-//    return false;
-//#endif
-//}
-//
-//bool Configuration::supportsATITC() const
-//{
-//    return _supportsATITC;
-//}
+bool Configuration::supportsS3TC() const
+{
+#ifdef GL_EXT_texture_compression_s3tc
+    return _supportsS3TC;
+#else
+    return false;
+#endif
+}
+
+bool Configuration::supportsATITC() const
+{
+    return _supportsATITC;
+}
 
 bool Configuration::supportsBGRA8888() const
 {
@@ -362,26 +357,8 @@ void Configuration::loadConfigFile(const std::string& filename)
             CCLOG("Key already present. Ignoring '%s'",dataMapIter->first.c_str());
     }
 
-    //light info
-    std::string name = "cocos2d.x.3d.max_dir_light_in_shader";
-    if (_valueDict.find(name) != _valueDict.end())
-        _maxDirLightInShader = _valueDict[name].asInt();
-    else
-        _valueDict[name] = Value(_maxDirLightInShader);
 
-    name = "cocos2d.x.3d.max_point_light_in_shader";
-    if (_valueDict.find(name) != _valueDict.end())
-        _maxPointLightInShader = _valueDict[name].asInt();
-    else
-        _valueDict[name] = Value(_maxPointLightInShader);
-
-    name = "cocos2d.x.3d.max_spot_light_in_shader";
-    if (_valueDict.find(name) != _valueDict.end())
-        _maxSpotLightInShader = _valueDict[name].asInt();
-    else
-        _valueDict[name] = Value(_maxSpotLightInShader);
-
-    Director::getInstance()->getEventDispatcher()->dispatchEvent(_loadedEvent);
+//cjh    Director::getInstance()->getEventDispatcher()->dispatchEvent(_loadedEvent);
 }
 
 NS_CC_END

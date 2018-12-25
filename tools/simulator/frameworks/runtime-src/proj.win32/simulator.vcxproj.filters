@@ -50,6 +50,9 @@
     <ClCompile Include="..\Classes\ide-support\RuntimeJsImpl.cpp">
       <Filter>Classes\ide-support</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\..\cocos\scripting\js-bindings\manual\jsb_module_register.cpp">
+      <Filter>Classes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="game.rc">

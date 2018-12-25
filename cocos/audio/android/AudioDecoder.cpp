@@ -1,5 +1,6 @@
 /****************************************************************************
 Copyright (c) 2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -32,7 +33,7 @@ THE SOFTWARE.
 #include <thread>
 #include <chrono>
 
-namespace cocos2d { namespace experimental {
+namespace cocos2d { 
 
 size_t AudioDecoder::fileRead(void* ptr, size_t size, size_t nmemb, void* datasource)
 {
@@ -93,7 +94,7 @@ bool AudioDecoder::init(const std::string &url, int sampleRate)
 bool AudioDecoder::start()
 {
     auto oldTime = clockNow();
-
+    auto nowTime = oldTime;
     bool ret;
     do
     {
@@ -103,23 +104,31 @@ bool AudioDecoder::start()
             ALOGE("decodeToPcm (%s) failed!", _url.c_str());
             break;
         }
+
+        nowTime = clockNow();
+        ALOGD("Decoding (%s) to pcm data wasted %fms", _url.c_str(), intervalInMS(oldTime, nowTime));
+        oldTime = nowTime;
+
         ret = resample();
         if (!ret) 
         {
             ALOGE("resample (%s) failed!", _url.c_str());
             break;
         }
+
+        nowTime = clockNow();
+        ALOGD("Resampling (%s) wasted %fms", _url.c_str(), intervalInMS(oldTime, nowTime));
+        oldTime = nowTime;
+
         ret = interleave();
         if (!ret) 
         {
             ALOGE("interleave (%s) failed!", _url.c_str());
             break;
         }
-
-        auto nowTime = clockNow();
-
-        ALOGV("Decoding (%s) to pcm data wasted %fms", _url.c_str(),
-              intervalInMS(oldTime, nowTime));
+        
+        nowTime = clockNow();
+        ALOGD("Interleave (%s) wasted %fms", _url.c_str(), intervalInMS(oldTime, nowTime));
 
     } while(false);
 
@@ -281,4 +290,4 @@ bool AudioDecoder::interleave()
     return false;
 }
 
-}} // namespace cocos2d { namespace experimental {
+} // namespace cocos2d { 

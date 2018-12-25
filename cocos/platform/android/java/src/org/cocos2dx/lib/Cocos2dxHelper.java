@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2012 cocos2d-x.org
-Copyright (c) 2013-2014 Chukong Technologies Inc.
+Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -24,42 +25,42 @@ THE SOFTWARE.
  ****************************************************************************/
 package org.cocos2dx.lib;
 
-import android.content.pm.PackageManager;
-import android.media.AudioManager;
 import android.app.Activity;
-import android.content.ComponentName;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.ServiceConnection;
-import android.content.SharedPreferences;
+import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
+import android.media.AudioManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Environment;
-import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
 import android.os.Vibrator;
 import android.preference.PreferenceManager.OnActivityResultListener;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
+import android.view.Surface;
 import android.view.WindowManager;
-import android.hardware.SensorManager;
 
 import com.android.vending.expansion.zipfile.APKExpansionSupport;
 import com.android.vending.expansion.zipfile.ZipResourceFile;
 
-import java.io.IOException;
 import java.io.File;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.LinkedHashSet;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
 
@@ -75,8 +76,6 @@ public class Cocos2dxHelper {
     // Fields
     // ===========================================================
 
-    private static Cocos2dxMusic sCocos2dMusic;
-    private static Cocos2dxSound sCocos2dSound;
     private static AssetManager sAssetManager;
     private static Cocos2dxAccelerometer sCocos2dxAccelerometer;
     private static boolean sAccelerometerEnabled;
@@ -94,6 +93,69 @@ public class Cocos2dxHelper {
     
     // The OBB file
     private static ZipResourceFile sOBBFile = null;
+
+    /**
+     * Battery receiver to getting battery level.
+     */
+    static class BatteryReceiver extends BroadcastReceiver {
+        public float sBatteryLevel = 0.0f;
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            setBatteryLevelByIntent(intent);
+        }
+
+        public void setBatteryLevelByIntent(Intent intent) {
+            if (null != intent) {
+                int current = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
+                int total = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 1);
+                float level = current * 1.0f / total;
+                // clamp to 0~1
+                sBatteryLevel = Math.min(Math.max(level, 0.0f), 1.0f);
+            }
+        }
+    }
+
+    private static BatteryReceiver sBatteryReceiver = new BatteryReceiver();
+
+    static void registerBatteryLevelReceiver(Context context) {
+        Intent intent = context.registerReceiver(sBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        sBatteryReceiver.setBatteryLevelByIntent(intent);
+    }
+
+    static void unregisterBatteryLevelReceiver(Context context) {
+        context.unregisterReceiver(sBatteryReceiver);
+    }
+
+    public static float getBatteryLevel() {
+        return sBatteryReceiver.sBatteryLevel;
+    }
+
+    public static final int NETWORK_TYPE_NONE = 0;
+    public static final int NETWORK_TYPE_LAN  = 1;
+    public static final int NETWORK_TYPE_WWAN = 2;
+
+    public static int getNetworkType() {
+        int status = NETWORK_TYPE_NONE;
+        NetworkInfo networkInfo;
+        try {
+            ConnectivityManager connMgr = (ConnectivityManager) sActivity.getSystemService(Context.CONNECTIVITY_SERVICE);
+            networkInfo = connMgr.getActiveNetworkInfo();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return status;
+        }
+        if (networkInfo == null) {
+            return status;
+        }
+        int nType = networkInfo.getType();
+        if (nType == ConnectivityManager.TYPE_MOBILE) {
+            status = NETWORK_TYPE_WWAN;
+        } else if (nType == ConnectivityManager.TYPE_WIFI) {
+            status = NETWORK_TYPE_LAN;
+        }
+        return status;
+    }
 
     // ===========================================================
     // Constructors
@@ -148,20 +210,15 @@ public class Cocos2dxHelper {
             Cocos2dxHelper.nativeSetApkPath(Cocos2dxHelper.getAssetsPath());
     
             Cocos2dxHelper.sCocos2dxAccelerometer = new Cocos2dxAccelerometer(activity);
-            Cocos2dxHelper.sCocos2dMusic = new Cocos2dxMusic(activity);
-            Cocos2dxHelper.sCocos2dSound = new Cocos2dxSound(activity);
             Cocos2dxHelper.sAssetManager = activity.getAssets();
             Cocos2dxHelper.nativeSetContext((Context)activity, Cocos2dxHelper.sAssetManager);
-    
-            Cocos2dxBitmap.setContext(activity);
-
             Cocos2dxHelper.sVibrateService = (Vibrator)activity.getSystemService(Context.VIBRATOR_SERVICE);
 
             sInited = true;
             
             int versionCode = 1;
             try {
-                versionCode = Cocos2dxActivity.getContext().getPackageManager().getPackageInfo(Cocos2dxHelper.getCocos2dxPackageName(), 0).versionCode;
+                versionCode = Cocos2dxActivity.getContext().getPackageManager().getPackageInfo(Cocos2dxHelper.getPackageName(), 0).versionCode;
             } catch (NameNotFoundException e) {
                 e.printStackTrace();
             }
@@ -236,10 +293,10 @@ public class Cocos2dxHelper {
 
     private static native void nativeSetAudioDeviceInfo(boolean isSupportLowLatency, int deviceSampleRate, int audioBufferSizeInFames);
 
-    public static String getCocos2dxPackageName() {
+    public static String getPackageName() {
         return Cocos2dxHelper.sPackageName;
     }
-    public static String getCocos2dxWritablePath() {
+    public static String getWritablePath() {
         return Cocos2dxHelper.sFileDirectory;
     }
 
@@ -257,12 +314,7 @@ public class Cocos2dxHelper {
 
     public static void enableAccelerometer() {
         Cocos2dxHelper.sAccelerometerEnabled = true;
-        Cocos2dxHelper.sCocos2dxAccelerometer.enableAccel();
-    }
-
-    public static void enableCompass() {
-        Cocos2dxHelper.sCompassEnabled = true;
-        Cocos2dxHelper.sCocos2dxAccelerometer.enableCompass();
+        Cocos2dxHelper.sCocos2dxAccelerometer.enable();
     }
 
     public static void setAccelerometerInterval(float interval) {
@@ -279,7 +331,31 @@ public class Cocos2dxHelper {
     }
 
     public static void vibrate(float duration) {
-        sVibrateService.vibrate((long)(duration * 1000));
+        try {
+            if (sVibrateService != null && sVibrateService.hasVibrator()) {
+                if (android.os.Build.VERSION.SDK_INT >= 26) {
+                    Class<?> vibrationEffectClass = Class.forName("android.os.VibrationEffect");
+                    if(vibrationEffectClass != null) {
+                        final int DEFAULT_AMPLITUDE = Cocos2dxReflectionHelper.<Integer>getConstantValue(vibrationEffectClass,
+                                "DEFAULT_AMPLITUDE");
+                        //VibrationEffect.createOneShot(long milliseconds, int amplitude)
+                        final Method method = vibrationEffectClass.getMethod("createOneShot",
+                                new Class[]{Long.TYPE, Integer.TYPE});
+                        Class<?> type = method.getReturnType();
+
+                        Object effect =  method.invoke(vibrationEffectClass,
+                                new Object[]{(long) (duration * 1000), DEFAULT_AMPLITUDE});
+                        //sVibrateService.vibrate(VibrationEffect effect);
+                        Cocos2dxReflectionHelper.invokeInstanceMethod(sVibrateService,"vibrate",
+                                new Class[]{type}, new Object[]{(effect)});
+                    }
+                } else {
+                    sVibrateService.vibrate((long) (duration * 1000));
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
  	public static String getVersion() {
@@ -326,102 +402,15 @@ public class Cocos2dxHelper {
         return array;
     }
 
-    public static void preloadBackgroundMusic(final String pPath) {
-        Cocos2dxHelper.sCocos2dMusic.preloadBackgroundMusic(pPath);
-    }
-
-    public static void playBackgroundMusic(final String pPath, final boolean isLoop) {
-        Cocos2dxHelper.sCocos2dMusic.playBackgroundMusic(pPath, isLoop);
-    }
-
-    public static void resumeBackgroundMusic() {
-        Cocos2dxHelper.sCocos2dMusic.resumeBackgroundMusic();
-    }
-
-    public static void pauseBackgroundMusic() {
-        Cocos2dxHelper.sCocos2dMusic.pauseBackgroundMusic();
-    }
-
-    public static void stopBackgroundMusic() {
-        Cocos2dxHelper.sCocos2dMusic.stopBackgroundMusic();
-    }
-
-    public static void rewindBackgroundMusic() {
-        Cocos2dxHelper.sCocos2dMusic.rewindBackgroundMusic();
-    }
-
-    public static boolean willPlayBackgroundMusic() {
-        return Cocos2dxHelper.sCocos2dMusic.willPlayBackgroundMusic();
-    }
-
-    public static boolean isBackgroundMusicPlaying() {
-        return Cocos2dxHelper.sCocos2dMusic.isBackgroundMusicPlaying();
-    }
-
-    public static float getBackgroundMusicVolume() {
-        return Cocos2dxHelper.sCocos2dMusic.getBackgroundVolume();
-    }
-
-    public static void setBackgroundMusicVolume(final float volume) {
-        Cocos2dxHelper.sCocos2dMusic.setBackgroundVolume(volume);
-    }
-
-    public static void preloadEffect(final String path) {
-        Cocos2dxHelper.sCocos2dSound.preloadEffect(path);
-    }
-
-    public static int playEffect(final String path, final boolean isLoop, final float pitch, final float pan, final float gain) {
-        return Cocos2dxHelper.sCocos2dSound.playEffect(path, isLoop, pitch, pan, gain);
-    }
-
-    public static void resumeEffect(final int soundId) {
-        Cocos2dxHelper.sCocos2dSound.resumeEffect(soundId);
-    }
-
-    public static void pauseEffect(final int soundId) {
-        Cocos2dxHelper.sCocos2dSound.pauseEffect(soundId);
-    }
-
-    public static void stopEffect(final int soundId) {
-        Cocos2dxHelper.sCocos2dSound.stopEffect(soundId);
-    }
-
-    public static float getEffectsVolume() {
-        return Cocos2dxHelper.sCocos2dSound.getEffectsVolume();
-    }
-
-    public static void setEffectsVolume(final float volume) {
-        Cocos2dxHelper.sCocos2dSound.setEffectsVolume(volume);
-    }
-
-    public static void unloadEffect(final String path) {
-        Cocos2dxHelper.sCocos2dSound.unloadEffect(path);
-    }
-
-    public static void pauseAllEffects() {
-        Cocos2dxHelper.sCocos2dSound.pauseAllEffects();
-    }
-
-    public static void resumeAllEffects() {
-        Cocos2dxHelper.sCocos2dSound.resumeAllEffects();
-    }
-
-    public static void stopAllEffects() {
-        Cocos2dxHelper.sCocos2dSound.stopAllEffects();
-    }
-
-    public static void end() {
-        Cocos2dxHelper.sCocos2dMusic.end();
-        Cocos2dxHelper.sCocos2dSound.end();
+    public static void endApplication() {
+        if (sActivity != null)
+            sActivity.finish();
     }
 
     public static void onResume() {
         sActivityVisible = true;
         if (Cocos2dxHelper.sAccelerometerEnabled) {
-            Cocos2dxHelper.sCocos2dxAccelerometer.enableAccel();
-        }
-        if (Cocos2dxHelper.sCompassEnabled) {
-            Cocos2dxHelper.sCocos2dxAccelerometer.enableCompass();
+            Cocos2dxHelper.sCocos2dxAccelerometer.enable();
         }
     }
 
@@ -433,13 +422,11 @@ public class Cocos2dxHelper {
     }
 
     public static void onEnterBackground() {
-        sCocos2dSound.onEnterBackground();
-        sCocos2dMusic.onEnterBackground();
+
     }
     
     public static void onEnterForeground() {
-        sCocos2dSound.onEnterForeground();
-        sCocos2dMusic.onEnterForeground();
+
     }
     
     public static void terminateProcess() {
@@ -449,7 +436,6 @@ public class Cocos2dxHelper {
     private static void showDialog(final String pTitle, final String pMessage) {
         Cocos2dxHelper.sCocos2dxHelperListener.showDialog(pTitle, pMessage);
     }
-
 
     public static void setEditTextDialogResult(final String pResult) {
         try {
@@ -484,155 +470,6 @@ public class Cocos2dxHelper {
         }
         return -1;
     }
-    
-    // ===========================================================
-    // Functions for CCUserDefault
-    // ===========================================================
-    
-    public static boolean getBoolForKey(String key, boolean defaultValue) {
-        SharedPreferences settings = sActivity.getSharedPreferences(Cocos2dxHelper.PREFS_NAME, 0);
-        try {
-            return settings.getBoolean(key, defaultValue);
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-
-            Map allValues = settings.getAll();
-            Object value = allValues.get(key);
-            if ( value instanceof String)
-            {
-                return  Boolean.parseBoolean(value.toString());
-            }
-            else if (value instanceof Integer)
-            {
-                int intValue = ((Integer) value).intValue();
-                return (intValue !=  0) ;
-            }
-            else if (value instanceof Float)
-            {
-                float floatValue = ((Float) value).floatValue();
-                return (floatValue != 0.0f);
-            }
-        }
-
-        return false;
-    }
-    
-    public static int getIntegerForKey(String key, int defaultValue) {
-        SharedPreferences settings = sActivity.getSharedPreferences(Cocos2dxHelper.PREFS_NAME, 0);
-        try {
-            return settings.getInt(key, defaultValue);
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-
-            Map allValues = settings.getAll();
-            Object value = allValues.get(key);
-            if ( value instanceof String) {
-                return  Integer.parseInt(value.toString());
-            }
-            else if (value instanceof Float)
-            {
-                return ((Float) value).intValue();
-            }
-            else if (value instanceof Boolean)
-            {
-                boolean booleanValue = ((Boolean) value).booleanValue();
-                if (booleanValue)
-                    return 1;
-            }
-        }
-
-        return 0;
-    }
-    
-    public static float getFloatForKey(String key, float defaultValue) {
-        SharedPreferences settings = sActivity.getSharedPreferences(Cocos2dxHelper.PREFS_NAME, 0);
-        try {
-            return settings.getFloat(key, defaultValue);
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();;
-
-            Map allValues = settings.getAll();
-            Object value = allValues.get(key);
-            if ( value instanceof String) {
-                return  Float.parseFloat(value.toString());
-            }
-            else if (value instanceof Integer)
-            {
-                return ((Integer) value).floatValue();
-            }
-            else if (value instanceof Boolean)
-            {
-                boolean booleanValue = ((Boolean) value).booleanValue();
-                if (booleanValue)
-                    return 1.0f;
-            }
-        }
-
-        return 0.0f;
-    }
-    
-    public static double getDoubleForKey(String key, double defaultValue) {
-        // SharedPreferences doesn't support saving double value
-        return getFloatForKey(key, (float) defaultValue);
-    }
-    
-    public static String getStringForKey(String key, String defaultValue) {
-        SharedPreferences settings = sActivity.getSharedPreferences(Cocos2dxHelper.PREFS_NAME, 0);
-        try {
-            return settings.getString(key, defaultValue);
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            
-            return settings.getAll().get(key).toString();
-        }
-    }
-    
-    public static void setBoolForKey(String key, boolean value) {
-        SharedPreferences settings = sActivity.getSharedPreferences(Cocos2dxHelper.PREFS_NAME, 0);
-        SharedPreferences.Editor editor = settings.edit();
-        editor.putBoolean(key, value);
-        editor.commit();
-    }
-    
-    public static void setIntegerForKey(String key, int value) {
-        SharedPreferences settings = sActivity.getSharedPreferences(Cocos2dxHelper.PREFS_NAME, 0);
-        SharedPreferences.Editor editor = settings.edit();
-        editor.putInt(key, value);
-        editor.commit();
-    }
-    
-    public static void setFloatForKey(String key, float value) {
-        SharedPreferences settings = sActivity.getSharedPreferences(Cocos2dxHelper.PREFS_NAME, 0);
-        SharedPreferences.Editor editor = settings.edit();
-        editor.putFloat(key, value);
-        editor.commit();
-    }
-    
-    public static void setDoubleForKey(String key, double value) {
-        // SharedPreferences doesn't support recording double value
-        SharedPreferences settings = sActivity.getSharedPreferences(Cocos2dxHelper.PREFS_NAME, 0);
-        SharedPreferences.Editor editor = settings.edit();
-        editor.putFloat(key, (float)value);
-        editor.commit();
-    }
-    
-    public static void setStringForKey(String key, String value) {
-        SharedPreferences settings = sActivity.getSharedPreferences(Cocos2dxHelper.PREFS_NAME, 0);
-        SharedPreferences.Editor editor = settings.edit();
-        editor.putString(key, value);
-        editor.commit();
-    }
-    
-    public static void deleteValueForKey(String key) {
-        SharedPreferences settings = sActivity.getSharedPreferences(Cocos2dxHelper.PREFS_NAME, 0);
-        SharedPreferences.Editor editor = settings.edit();
-        editor.remove(key);
-        editor.commit();
-    }
 
     public static byte[] conversionEncoding(byte[] text, String fromCharset,String newCharset)
     {
@@ -645,7 +482,59 @@ public class Cocos2dxHelper {
 
         return null;
     }
-    
+
+    private static void setGameInfoDebugViewText(int index, String text) {
+        if (sOnGameInfoUpdatedListener != null) {
+            if (index == 0) {
+                sOnGameInfoUpdatedListener.onGameInfoUpdated_0(text);
+            }
+            else if (index == 1) {
+                sOnGameInfoUpdatedListener.onGameInfoUpdated_1(text);
+            }
+            else if (index == 2) {
+                sOnGameInfoUpdatedListener.onGameInfoUpdated_2(text);
+            }
+        }
+    }
+
+    private static void setJSBInvocationCount(int count) {
+        if (sOnGameInfoUpdatedListener != null) {
+            sOnGameInfoUpdatedListener.onJSBInvocationCountUpdated(count);
+        }
+    }
+
+    private static void openDebugView() {
+        if (sOnGameInfoUpdatedListener != null) {
+            sOnGameInfoUpdatedListener.onOpenDebugView();
+        }
+    }
+
+    private static void disableBatchGLCommandsToNative() {
+        if (sOnGameInfoUpdatedListener != null) {
+            sOnGameInfoUpdatedListener.onDisableBatchGLCommandsToNative();
+        }
+    }
+
+    public interface OnGameInfoUpdatedListener {
+        void onFPSUpdated(float fps);
+        void onJSBInvocationCountUpdated(int count);
+        void onOpenDebugView();
+        void onDisableBatchGLCommandsToNative();
+        void onGameInfoUpdated_0(String text);
+        void onGameInfoUpdated_1(String text);
+        void onGameInfoUpdated_2(String text);
+    }
+
+    private static OnGameInfoUpdatedListener sOnGameInfoUpdatedListener;
+
+    public static void setOnGameInfoUpdatedListener(OnGameInfoUpdatedListener listener) {
+        sOnGameInfoUpdatedListener = listener;
+    }
+
+    public static OnGameInfoUpdatedListener getOnGameInfoUpdatedListener() {
+        return sOnGameInfoUpdatedListener;
+    }
+
     // ===========================================================
     // Inner and Anonymous Classes
     // ===========================================================
@@ -655,16 +544,42 @@ public class Cocos2dxHelper {
 
         public void runOnGLThread(final Runnable pRunnable);
     }
- 
-    public static float[] getAccelValue() {
-        return Cocos2dxHelper.sCocos2dxAccelerometer.accelerometerValues;
-    }
 
-    public static float[] getCompassValue() {
-        return Cocos2dxHelper.sCocos2dxAccelerometer.compassFieldValues;
+    private static float[] sDeviceMotionValues = new float[9];
+
+    private static float[] getDeviceMotionValue() {
+        Cocos2dxAccelerometer.DeviceMotionEvent event = Cocos2dxHelper.sCocos2dxAccelerometer.getDeviceMotionEvent();
+        sDeviceMotionValues[0] = event.acceleration.x;
+        sDeviceMotionValues[1] = event.acceleration.y;
+        sDeviceMotionValues[2] = event.acceleration.z;
+
+        sDeviceMotionValues[3] = event.accelerationIncludingGravity.x;
+        sDeviceMotionValues[4] = event.accelerationIncludingGravity.y;
+        sDeviceMotionValues[5] = event.accelerationIncludingGravity.z;
+
+        sDeviceMotionValues[6] = event.rotationRate.alpha;
+        sDeviceMotionValues[7] = event.rotationRate.beta;
+        sDeviceMotionValues[8] = event.rotationRate.gamma;
+
+        return sDeviceMotionValues;
     }
 
     public static int getSDKVersion() {
         return Build.VERSION.SDK_INT;
+    }
+
+    public static String getSystemVersion() {
+        return Build.VERSION.RELEASE;
+    }
+
+
+    public static int getDeviceRotation() {
+        try {
+            Display display = ((WindowManager) sActivity.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
+            return display.getRotation();
+        } catch (NullPointerException e) {
+            e.printStackTrace();
+        }
+        return Surface.ROTATION_0;
     }
 }

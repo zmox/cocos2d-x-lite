@@ -3,6 +3,7 @@ Copyright (c) 2008-2010 Ricardo Quesada
 Copyright (c) 2010-2012 cocos2d-x.org
 Copyright (c) 2011      Zynga Inc.
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos2d-x.org
 
@@ -213,6 +214,22 @@ bool Color4F::operator!=(const Color4B& right) const
 {
     return !(*this == right);
 }
+
+// Color3F
+
+Color3F::Color3F()
+: r(0.0f)
+, g(0.0f)
+, b(0.0f)
+{}
+
+Color3F::Color3F(float _r, float _g, float _b)
+: r(_r)
+, g(_g)
+, b(_b)
+{}
+
+const Color3F Color3F::BLACK = {0, 0, 0};
 
 /**
  * Color constants

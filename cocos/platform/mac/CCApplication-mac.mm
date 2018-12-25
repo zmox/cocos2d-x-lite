@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2012 cocos2d-x.org
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -22,136 +23,185 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ****************************************************************************/
-
-#include "platform/CCPlatformConfig.h"
-#if CC_TARGET_PLATFORM == CC_PLATFORM_MAC
-
+#include "platform/CCApplication.h"
 #import <Cocoa/Cocoa.h>
 #include <algorithm>
-
-#import "platform/CCApplication.h"
-#include "platform/CCFileUtils.h"
-#include "math/CCGeometry.h"
-#include "base/CCDirector.h"
+#include <mutex>
+#include "base/CCScheduler.h"
+#include "base/CCAutoreleasePool.h"
+#include "base/CCGLUtils.h"
+#include "base/CCConfiguration.h"
+#include "platform/desktop/CCGLView-desktop.h"
+#include "scripting/js-bindings/event/EventDispatcher.h"
+#include "scripting/js-bindings/jswrapper/SeApi.h"
+#include "base/CCGLUtils.h"
+#include "audio/include/AudioEngine.h"
 
 NS_CC_BEGIN
 
-static long getCurrentMillSecond()
+namespace
 {
-    long lLastTime = 0;
-    struct timeval stCurrentTime;
-
-    gettimeofday(&stCurrentTime,NULL);
-    lLastTime = stCurrentTime.tv_sec*1000+stCurrentTime.tv_usec*0.001; //millseconds
-    return lLastTime;
+    int g_width = 0;
+    int g_height = 0;
+    bool setCanvasCallback(se::Object* global)
+    {
+        se::ScriptEngine* se = se::ScriptEngine::getInstance();
+        char commandBuf[200] = {0};
+        int devicePixelRatio = Application::getInstance()->getDevicePixelRatio();
+        sprintf(commandBuf, "window.innerWidth = %d; window.innerHeight = %d;",
+                g_width / devicePixelRatio,
+                g_height / devicePixelRatio);
+        se->evalString(commandBuf);
+        ccViewport(0, 0, g_width / devicePixelRatio, g_height / devicePixelRatio);
+        glDepthMask(GL_TRUE);
+        return true;
+    }
 }
 
-Application* Application::sm_pSharedApplication = nullptr;
+Application* Application::_instance = nullptr;
+std::shared_ptr<Scheduler> Application::_scheduler = nullptr;
 
-Application::Application()
-: _animationInterval(1.0f/60.0f*1000.0f)
+#define CAST_VIEW(view)    ((GLView*)view)
+
+Application::Application(const std::string& name, int width, int height)
 {
-    CCASSERT(! sm_pSharedApplication, "sm_pSharedApplication already exist");
-    sm_pSharedApplication = this;
+    Application::_instance = this;
+    
+    g_width = width;
+    g_height = height;
+    
+    createView(name, width, height);
+
+    Configuration::getInstance();
+
+    _renderTexture = new RenderTexture(width, height);
+    _scheduler = std::make_shared<Scheduler>();
+    
+    EventDispatcher::init();
+    se::ScriptEngine::getInstance();
 }
 
 Application::~Application()
 {
-    CCASSERT(this == sm_pSharedApplication, "sm_pSharedApplication != this");
-    sm_pSharedApplication = 0;
+
+#if USE_AUDIO
+    AudioEngine::end();
+#endif
+
+    EventDispatcher::destroy();
+    se::ScriptEngine::destroyInstance();
+    
+    delete CAST_VIEW(_view);
+    _view = nullptr;
+        
+    delete _renderTexture;
+    _renderTexture = nullptr;
+
+    Application::_instance = nullptr;
 }
 
-int Application::run()
+void Application::start()
 {
-    initGLContextAttrs();
-    if(!applicationDidFinishLaunching())
+    if (!_view)
+        return;
+
+    float dt = 0.f;
+    long long actualInternal = 0; // actual frame internal
+    long long desiredInterval = 0; // desired frame internal, 1 / fps
+
+    std::chrono::steady_clock::time_point prev;
+    std::chrono::steady_clock::time_point now;
+
+    prev = std::chrono::steady_clock::now();
+
+    se::ScriptEngine* se = se::ScriptEngine::getInstance();
+
+    while (!CAST_VIEW(_view)->windowShouldClose())
     {
-        return 1;
-    }
-
-    long lastTime = 0L;
-    long curTime = 0L;
-
-    auto director = Director::getInstance();
-    auto glview = director->getOpenGLView();
-
-    // Retain glview to avoid glview being released in the while loop
-    glview->retain();
-
-    while (!glview->windowShouldClose())
-    {
-        lastTime = getCurrentMillSecond();
-
-        director->mainLoop();
-        glview->pollEvents();
-
-        curTime = getCurrentMillSecond();
-        if (curTime - lastTime < _animationInterval)
+        desiredInterval = 1.0 / _fps * 1000000;
+        if (!_isStarted)
         {
-            usleep(static_cast<useconds_t>((_animationInterval - curTime + lastTime)*1000));
+            auto scheduler = Application::getInstance()->getScheduler();
+            scheduler->removeAllFunctionsToBePerformedInCocosThread();
+            scheduler->unscheduleAll();
+
+            se::ScriptEngine::getInstance()->cleanup();
+            cocos2d::PoolManager::getInstance()->getCurrentPool()->clear();
+            cocos2d::EventDispatcher::init();
+
+            ccInvalidateStateCache();
+            se->addRegisterCallback(setCanvasCallback);
+
+            if(!applicationDidFinishLaunching())
+                return;
+
+            _isStarted = true;
+        }
+
+        // should be invoked at the begin of rendering a frame
+        if (_isDownsampleEnabled)
+            _renderTexture->prepare();
+
+        CAST_VIEW(_view)->pollEvents();
+
+        if (_isStarted)
+        {
+            now = std::chrono::steady_clock::now();
+            actualInternal = std::chrono::duration_cast<std::chrono::microseconds>(now - prev).count();
+            if (actualInternal >= desiredInterval)
+            {
+                prev = now;
+                dt = (float)actualInternal / 1000000.f;
+                _scheduler->update(dt);
+
+                EventDispatcher::dispatchTickEvent(dt);
+
+                if (_isDownsampleEnabled)
+                    _renderTexture->draw();
+
+                CAST_VIEW(_view)->swapBuffers();
+                PoolManager::getInstance()->getCurrentPool()->clear();
+            }
+            else
+            {
+                // sleep 3ms may make a sleep of 4ms
+                std::this_thread::sleep_for(std::chrono::microseconds(desiredInterval - actualInternal - 1000));
+            }
+        }
+        else
+        {
+            std::this_thread::sleep_for(std::chrono::microseconds(desiredInterval));
         }
     }
-
-    /* Only work on Desktop
-    *  Director::mainLoop is really one frame logic
-    *  when we want to close the window, we should call Director::end();
-    *  then call Director::mainLoop to do release of internal resources
-    */
-    if (glview->isOpenGLReady())
-    {
-        director->end();
-        director->mainLoop();
-    }
-
-    glview->release();
-
-    return 0;
 }
 
-void Application::setAnimationInterval(float interval)
+void Application::restart()
 {
-    _animationInterval = interval*1000.0f;
+    _isStarted = false;
 }
 
-Application::Platform Application::getTargetPlatform()
+void Application::end()
 {
-    return Platform::OS_MAC;
+    glfwSetWindowShouldClose(CAST_VIEW(_view)->getGLFWWindow(), 1);
 }
 
-std::string Application::getVersion() {
-    NSString* version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
-    if (version) {
-        return [version UTF8String];
-    }
-    return "";
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////
-// static member function
-//////////////////////////////////////////////////////////////////////////////////////////////////
-
-Application* Application::getInstance()
+void Application::setPreferredFramesPerSecond(int fps)
 {
-    CCASSERT(sm_pSharedApplication, "sm_pSharedApplication not set");
-    return sm_pSharedApplication;
+    _fps = fps;
 }
 
-void Application::destroyInstance()
+Application::Platform Application::getPlatform() const
 {
-    if (sm_pSharedApplication) {
-        delete  sm_pSharedApplication;
-    }
-
-    sm_pSharedApplication = nullptr;
+    return Platform::MAC;
 }
 
-const char * Application::getCurrentLanguageCode()
+std::string Application::getCurrentLanguageCode() const
 {
     static char code[3]={0};
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSArray *languages = [defaults objectForKey:@"AppleLanguages"];
     NSString *currentLanguage = [languages objectAtIndex:0];
-
+    
     // get the current language code.(such as English is "en", Chinese is "zh" and so on)
     NSDictionary* temp = [NSLocale componentsFromLocaleIdentifier:currentLanguage];
     NSString * languageCode = [temp objectForKey:NSLocaleLanguageCode];
@@ -160,17 +210,32 @@ const char * Application::getCurrentLanguageCode()
     return code;
 }
 
-LanguageType Application::getCurrentLanguage()
+bool Application::isDisplayStats() {
+    se::AutoHandleScope hs;
+    se::Value ret;
+    char commandBuf[100] = "cc.debug.isDisplayStats();";
+    se::ScriptEngine::getInstance()->evalString(commandBuf, 100, &ret);
+    return ret.toBoolean();
+}
+
+void Application::setDisplayStats(bool isShow) {
+    se::AutoHandleScope hs;
+    char commandBuf[100] = {0};
+    sprintf(commandBuf, "cc.debug.setDisplayStats(%s);", isShow ? "true" : "false");
+    se::ScriptEngine::getInstance()->evalString(commandBuf);
+}
+
+Application::LanguageType Application::getCurrentLanguage() const
 {
     // get the current language and country config
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSArray *languages = [defaults objectForKey:@"AppleLanguages"];
     NSString *currentLanguage = [languages objectAtIndex:0];
-
+    
     // get the current language code.(such as English is "en", Chinese is "zh" and so on)
     NSDictionary* temp = [NSLocale componentsFromLocaleIdentifier:currentLanguage];
     NSString * languageCode = [temp objectForKey:NSLocaleLanguageCode];
-
+    
     if ([languageCode isEqualToString:@"zh"]) return LanguageType::CHINESE;
     if ([languageCode isEqualToString:@"en"]) return LanguageType::ENGLISH;
     if ([languageCode isEqualToString:@"fr"]) return LanguageType::FRENCH;
@@ -191,7 +256,16 @@ LanguageType Application::getCurrentLanguage()
     if ([languageCode isEqualToString:@"ro"]) return LanguageType::ROMANIAN;
     if ([languageCode isEqualToString:@"bg"]) return LanguageType::BULGARIAN;
     return LanguageType::ENGLISH;
+}
 
+float Application::getScreenScale() const
+{
+    return CAST_VIEW(_view)->getScale();
+}
+
+GLint Application::getMainFBO() const
+{
+    return CAST_VIEW(_view)->getMainFBO();
 }
 
 bool Application::openURL(const std::string &url)
@@ -201,17 +275,50 @@ bool Application::openURL(const std::string &url)
     return [[NSWorkspace sharedWorkspace] openURL:nsUrl];
 }
 
-void Application::setStartupScriptFilename(const std::string& startupScriptFile)
+bool Application::applicationDidFinishLaunching()
 {
-    _startupScriptFilename = startupScriptFile;
-    std::replace(_startupScriptFilename.begin(), _startupScriptFilename.end(), '\\', '/');
+    return true;
 }
 
-const std::string& Application::getStartupScriptFilename(void)
+void Application::applicationDidEnterBackground()
 {
-    return _startupScriptFilename;
+}
+
+void Application::applicationWillEnterForeground()
+{
+}
+
+void Application::setMultitouch(bool)
+{
+}
+
+void Application::onCreateView(PixelFormat& pixelformat, DepthFormat& depthFormat, int& multisamplingCount)
+{
+    pixelformat = PixelFormat::RGBA8;
+    depthFormat = DepthFormat::DEPTH24_STENCIL8;
+
+    multisamplingCount = 0;
+}
+
+void Application::createView(const std::string& name, int width, int height)
+{
+    int multisamplingCount = 0;
+    PixelFormat pixelformat;
+    DepthFormat depthFormat;
+    
+    onCreateView(pixelformat,
+                 depthFormat,
+                 multisamplingCount);
+
+    _view = new GLView(this, name, 0, 0, width, height, pixelformat, depthFormat, multisamplingCount);
+}
+
+std::string Application::getSystemVersion()
+{
+    NSOperatingSystemVersion v = NSProcessInfo.processInfo.operatingSystemVersion;
+    char version[50] = {0};
+    snprintf(version, sizeof(version), "%d.%d.%d", (int)v.majorVersion, (int)v.minorVersion, (int)v.patchVersion);
+    return version;
 }
 
 NS_CC_END
-
-#endif // CC_TARGET_PLATFORM == CC_PLATFORM_MAC

@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2011 cocos2d-x.org
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -29,6 +30,7 @@ import android.os.Looper;
 import android.util.SparseArray;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.RelativeLayout;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -39,12 +41,12 @@ public class Cocos2dxWebViewHelper {
     private static final String TAG = Cocos2dxWebViewHelper.class.getSimpleName();
     private static Handler sHandler;
     private static Cocos2dxActivity sCocos2dxActivity;
-    private static FrameLayout sLayout;
+    private static RelativeLayout sLayout;
 
     private static SparseArray<Cocos2dxWebView> webViews;
     private static int viewTag = 0;
 
-    public Cocos2dxWebViewHelper(FrameLayout layout) {
+    public Cocos2dxWebViewHelper(RelativeLayout layout) {
         Cocos2dxWebViewHelper.sLayout = layout;
         Cocos2dxWebViewHelper.sHandler = new Handler(Looper.myLooper());
 
@@ -101,6 +103,8 @@ public class Cocos2dxWebViewHelper {
                 if (webView != null) {
                     webViews.remove(index);
                     sLayout.removeView(webView);
+                    webView.destroy();
+                    webView = null;
                 }
             }
         });

@@ -1,3 +1,28 @@
+/****************************************************************************
+ Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
+
+ http://www.cocos.com
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated engine source code (the "Software"), a limited,
+ worldwide, royalty-free, non-assignable, revocable and non-exclusive license
+ to use Cocos Creator solely to develop games on your target platforms. You shall
+ not use Cocos Creator software for developing other software or tools that's
+ used for developing games. You are not granted to publish, distribute,
+ sublicense, and/or sell copies of Cocos Creator.
+
+ The software or tools in this License Agreement are licensed, not sold.
+ Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ ****************************************************************************/
+
 
 #include "json/document.h"
 #include "json/stringbuffer.h"
@@ -28,22 +53,22 @@ void ConfigParser::readConfig(const string &filepath)
 
 #if (CC_TARGET_PLATFORM == CC_PLATFORM_IOS || CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
     // add writable path to search path temporarily for reading config file
-    vector<std::string> searchPathArray = FileUtils::getInstance()->getSearchPaths();
+    vector<std::string> searchPathArray = cocos2d::FileUtils::getInstance()->getSearchPaths();
     searchPathArray.insert(searchPathArray.begin(), FileServer::getShareInstance()->getWritePath());
-    FileUtils::getInstance()->setSearchPaths(searchPathArray);
+    cocos2d::FileUtils::getInstance()->setSearchPaths(searchPathArray);
 #endif
     
     // read config file
     if (fullPathFile.empty())
     {
-        fullPathFile = FileUtils::getInstance()->fullPathForFilename(CONFIG_FILE);
+        fullPathFile = cocos2d::FileUtils::getInstance()->fullPathForFilename(CONFIG_FILE);
     }
-    string fileContent = FileUtils::getInstance()->getStringFromFile(fullPathFile);
+    string fileContent = cocos2d::FileUtils::getInstance()->getStringFromFile(fullPathFile);
   
 #if (CC_TARGET_PLATFORM == CC_PLATFORM_IOS || CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
     // revert search path
     searchPathArray.erase(searchPathArray.begin());
-    FileUtils::getInstance()->setSearchPaths(searchPathArray);
+    cocos2d::FileUtils::getInstance()->setSearchPaths(searchPathArray);
 #endif
 
     if(fileContent.empty())
@@ -99,6 +124,10 @@ void ConfigParser::readConfig(const string &filepath)
             {
                 _isWindowTop= objectInitView["isWindowTop"].GetBool();
             }
+            if (objectInitView.HasMember("waitForConnect") && objectInitView["waitForConnect"].IsBool())
+            {
+                _isWaitForConnect= objectInitView["waitForConnect"].GetBool();
+            }
         }
     }
     if (_docRootjson.HasMember("simulator_screen_size"))
@@ -146,7 +175,7 @@ string ConfigParser::getEntryFile()
     return _entryfile;
 }
 
-Size ConfigParser::getInitViewSize()
+cocos2d::Size ConfigParser::getInitViewSize()
 {
     return _initViewSize;
 }
@@ -160,6 +189,12 @@ bool ConfigParser::isWindowTop()
 {
     return _isWindowTop;
 }
+
+bool ConfigParser::isWaitForConnect()
+{
+    return _isWaitForConnect;
+}
+
 void ConfigParser::setConsolePort(int port)
 {
     if (port > 0)

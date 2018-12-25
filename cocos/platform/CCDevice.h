@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2012 cocos2d-x.org
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -26,9 +27,9 @@ THE SOFTWARE.
 #ifndef __CCDEVICE_H__
 #define __CCDEVICE_H__
 
-#include "platform/CCPlatformMacros.h"
 #include "base/ccMacros.h"
 #include "base/CCData.h"
+#include "math/Vec4.h"
 
 NS_CC_BEGIN
 
@@ -46,18 +47,25 @@ struct FontDefinition;
 class CC_DLL Device
 {
 public:
-    /** Defines the alignment of text. */
-    enum class TextAlign
-    {
-        CENTER        = 0x33, /** Horizontal center and vertical center. */
-        TOP           = 0x13, /** Horizontal center and vertical top. */
-        TOP_RIGHT     = 0x12, /** Horizontal right and vertical top. */
-        RIGHT         = 0x32, /** Horizontal right and vertical center. */
-        BOTTOM_RIGHT  = 0x22, /** Horizontal right and vertical bottom. */
-        BOTTOM        = 0x23, /** Horizontal center and vertical bottom. */
-        BOTTOM_LEFT   = 0x21, /** Horizontal left and vertical bottom. */
-        LEFT          = 0x31, /** Horizontal left and vertical center. */
-        TOP_LEFT      = 0x11, /** Horizontal left and vertical top. */
+    enum class Rotation {
+        _0 = 0,
+        _90,
+        _180,
+        _270
+    };
+
+    struct MotionValue {
+        float accelerationX = 0.0f;
+        float accelerationY = 0.0f;
+        float accelerationZ = 0.0f;
+
+        float accelerationIncludingGravityX = 0.0f;
+        float accelerationIncludingGravityY = 0.0f;
+        float accelerationIncludingGravityZ = 0.0f;
+
+        float rotationRateAlpha = 0.0f;
+        float rotationRateBeta = 0.0f;
+        float rotationRateGamma = 0.0f;
     };
 
     /**
@@ -77,6 +85,21 @@ public:
     static void setAccelerometerInterval(float interval);
 
     /**
+     *  Gets the motion value of current device.
+     */
+    static const MotionValue& getDeviceMotionValue();
+
+    /**
+     *  Gets the rotation of device.
+     */
+    static Rotation getDeviceRotation();
+
+    /**
+     *  Gets device model information.
+     */
+    static std::string getDeviceModel();
+
+    /**
      * Controls whether the screen should remain on.
      *
      * @param keepScreenOn One flag indicating that the screen should remain on.
@@ -93,12 +116,29 @@ public:
     static void vibrate(float duration);
 
     /**
-     * Gets texture data for text.
+     * Gets battery level, only avaiable on iOS and Android.
+     * @return 0.0 ~ 1.0
      */
-    static Data getTextureDataForText(const char * text, const FontDefinition& textDefinition, TextAlign align, int &width, int &height, bool& hasPremultipliedAlpha);
+    static float getBatteryLevel();
+
+    enum class NetworkType
+    {
+        NONE,
+        LAN,
+        WWAN
+    };
+
+    static NetworkType getNetworkType();
+
+    /*
+     * Gets the SafeArea edge.
+     * Vec4(x, y, z, w) means Edge(top, left, bottom, right)
+     */
+    static cocos2d::Vec4 getSafeAreaEdge();
 
 private:
-    CC_DISALLOW_IMPLICIT_CONSTRUCTORS(Device);
+	Device();
+	CC_DISALLOW_COPY_AND_ASSIGN(Device);
 };
 
 // end group

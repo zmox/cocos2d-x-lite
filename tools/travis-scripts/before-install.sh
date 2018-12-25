@@ -13,7 +13,7 @@ popd
 mkdir -p $HOME/bin
 cd $HOME/bin
 
-install_android_ndk()
+function install_android_ndk()
 {
     # Download android ndk
     if [ $TRAVIS_OS_NAME = 'osx' ]; then
@@ -21,12 +21,21 @@ install_android_ndk()
     else
         HOST_NAME="linux"
     fi
-    echo "Download android-ndk-r11c-${HOST_NAME}-x86_64.zip ..."
-    curl -O http://dl.google.com/android/repository/android-ndk-r11c-${HOST_NAME}-x86_64.zip
-    echo "Decompress android-ndk-r11c-${HOST_NAME}-x86_64.zip ..."
-    unzip -q android-ndk-r11c-${HOST_NAME}-x86_64.zip
+    echo "Download android-ndk-r16b-${HOST_NAME}-x86_64.zip ..."
+    curl -O http://dl.google.com/android/repository/android-ndk-r16b-${HOST_NAME}-x86_64.zip
+    echo "Decompress android-ndk-r16b-${HOST_NAME}-x86_64.zip ..."
+    unzip -q android-ndk-r16b-${HOST_NAME}-x86_64.zip
     # Rename ndk
-    mv android-ndk-r11c android-ndk
+    mv android-ndk-r16b android-ndk
+}
+
+function install_clang()
+{
+    echo "Download clang"
+    curl -O http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-linux-x86_64-ubuntu14.04.tar.xz
+    echo "Decompress clang"
+    tar xpf ./clang+llvm-5.0.0-linux-x86_64-ubuntu14.04.tar.xz
+    cp ./clang+llvm-5.0.0-linux-x86_64-ubuntu14.04/lib/libclang.so.5.0 $COCOS2DX_ROOT/tools/bindings-generator/libclang/libclang.so
 }
 
 function install_python_module_for_osx()
@@ -39,3 +48,4 @@ function install_python_module_for_osx()
 #we only use osx for generate bindings
 install_android_ndk
 install_python_module_for_osx
+install_clang

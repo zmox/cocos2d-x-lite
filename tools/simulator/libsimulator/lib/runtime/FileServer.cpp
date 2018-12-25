@@ -1,5 +1,7 @@
 /****************************************************************************
 Copyright (c) 2013 cocos2d-x.org
+Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -34,7 +36,11 @@ THE SOFTWARE.
 #include <sys/stat.h>
 #endif
 
-USING_NS_CC;
+#if CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID
+    #ifndef bzero
+        #define bzero(a, b) memset(a, 0, b);
+    #endif
+#endif
 
 //1M size
 #define MAXPROTOLENGTH 1048576
@@ -72,17 +78,18 @@ void FileServer::readResFileFinfo()
     }
     
     //save file info to disk every five second
-    Director::getInstance()->getScheduler()->schedule([&](float){
-        rapidjson::StringBuffer buffer;
-        rapidjson::Writer< rapidjson::StringBuffer > writer(buffer);
-        _filecfgjson.Accept(writer);
-        const char* str = buffer.GetString();
-        std::string filecfg = _writePath + "/fileinfo_debug.json";
-        FILE * pFile = fopen(filecfg.c_str(), "w");
-        if (!pFile) return ;
-        fwrite(str, sizeof(char), strlen(str), pFile);
-        fclose(pFile);
-    },this, 5.0f, false, "fileinfo");
+    CCLOG("FileServer::readResFileFinfo()");
+//    cocos2d::Director::getInstance()->getScheduler()->schedule([&](float){
+//        rapidjson::StringBuffer buffer;
+//        rapidjson::Writer< rapidjson::StringBuffer > writer(buffer);
+//        _filecfgjson.Accept(writer);
+//        const char* str = buffer.GetString();
+//        std::string filecfg = _writePath + "/fileinfo_debug.json";
+//        FILE * pFile = fopen(filecfg.c_str(), "w");
+//        if (!pFile) return ;
+//        fwrite(str, sizeof(char), strlen(str), pFile);
+//        fclose(pFile);
+//    },this, 5.0f, false, "fileinfo");
 }
 
 void FileServer::addResFileInfo(const char* filename, uint64_t u64)
@@ -255,7 +262,7 @@ _responseEndThread(false)
     _isUsingWritePath = true;
 #endif
     
-    _writePath = FileUtils::getInstance()->getWritablePath();
+    _writePath = cocos2d::FileUtils::getInstance()->getWritablePath();
     
 #if (CC_TARGET_PLATFORM == CC_PLATFORM_MAC)
 #include "Widget_mac.h"

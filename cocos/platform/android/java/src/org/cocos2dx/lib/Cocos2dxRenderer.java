@@ -1,5 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2011 cocos2d-x.org
+Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -25,17 +27,22 @@ package org.cocos2dx.lib;
 
 import android.opengl.GLSurfaceView;
 
+import java.lang.ref.WeakReference;
+
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 public class Cocos2dxRenderer implements GLSurfaceView.Renderer {
     // ===========================================================
     // Constants
     // ===========================================================
+    private final static String TAG = "Cocos2dxRenderer";
 
     private final static long NANOSECONDSPERSECOND = 1000000000L;
     private final static long NANOSECONDSPERMICROSECOND = 1000000;
 
-    private static long sAnimationInterval = (long) (1.0 / 60 * Cocos2dxRenderer.NANOSECONDSPERSECOND);
+    private static final long INTERVAL_60_FPS = (long) (1.0 / 60 * Cocos2dxRenderer.NANOSECONDSPERSECOND);
+    private static long sAnimationInterval = INTERVAL_60_FPS;
+    private static WeakReference<Cocos2dxRenderer> sRenderer;
 
     // ===========================================================
     // Fields
@@ -45,6 +52,10 @@ public class Cocos2dxRenderer implements GLSurfaceView.Renderer {
     private int mScreenWidth;
     private int mScreenHeight;
     private boolean mNativeInitCompleted = false;
+    private boolean mNeedShowFPS = false;
+    private String mDefaultResourcePath = "";
+    private long mOldNanoTime = 0;
+    private long mFrameCount = 0;
 
     // ===========================================================
     // Constructors
@@ -54,13 +65,33 @@ public class Cocos2dxRenderer implements GLSurfaceView.Renderer {
     // Getter & Setter
     // ===========================================================
 
-    public static void setAnimationInterval(final float animationInterval) {
-        Cocos2dxRenderer.sAnimationInterval = (long) (animationInterval * Cocos2dxRenderer.NANOSECONDSPERSECOND);
+    public static void setPreferredFramesPerSecond(int fps) {
+        Cocos2dxRenderer.sAnimationInterval = (long) (1.0 / fps * Cocos2dxRenderer.NANOSECONDSPERSECOND);
     }
 
     public void setScreenWidthAndHeight(final int surfaceWidth, final int surfaceHeight) {
         this.mScreenWidth = surfaceWidth;
         this.mScreenHeight = surfaceHeight;
+    }
+
+    public void setDefaultResourcePath(String path) {
+        if (path == null)
+            return;
+        mDefaultResourcePath = path;
+    }
+
+    public void showFPS() {
+        mNeedShowFPS = true;
+    }
+
+    public interface OnGameEngineInitializedListener {
+        void onGameEngineInitialized();
+    }
+
+    private OnGameEngineInitializedListener mGameEngineInitializedListener;
+
+    public void setOnGameEngineInitializedListener(OnGameEngineInitializedListener listener) {
+        mGameEngineInitializedListener = listener;
     }
 
     // ===========================================================
@@ -69,9 +100,18 @@ public class Cocos2dxRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onSurfaceCreated(final GL10 GL10, final EGLConfig EGLConfig) {
-        Cocos2dxRenderer.nativeInit(this.mScreenWidth, this.mScreenHeight);
+        Cocos2dxRenderer.nativeInit(this.mScreenWidth, this.mScreenHeight, mDefaultResourcePath);
+        mOldNanoTime = System.nanoTime();
         this.mLastTickInNanoSeconds = System.nanoTime();
         mNativeInitCompleted = true;
+        if (mGameEngineInitializedListener != null) {
+            Cocos2dxHelper.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    mGameEngineInitializedListener.onGameEngineInitialized();
+                }
+            });
+        }
     }
 
     @Override
@@ -81,11 +121,28 @@ public class Cocos2dxRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onDrawFrame(final GL10 gl) {
+        if (mNeedShowFPS) {
+            /////////////////////////////////////////////////////////////////////
+            //IDEA: show FPS in Android Text control rather than outputing log.
+            ++mFrameCount;
+            long nowFpsTime = System.nanoTime();
+            long fpsTimeInterval = nowFpsTime - mOldNanoTime;
+            if (fpsTimeInterval > 1000000000L) {
+                double frameRate = 1000000000.0 * mFrameCount / fpsTimeInterval;
+                Cocos2dxHelper.OnGameInfoUpdatedListener listener = Cocos2dxHelper.getOnGameInfoUpdatedListener();
+                if (listener != null) {
+                    listener.onFPSUpdated((float) frameRate);
+                }
+                mFrameCount = 0;
+                mOldNanoTime = System.nanoTime();
+            }
+            /////////////////////////////////////////////////////////////////////
+        }
         /*
          * No need to use algorithm in default(60 FPS) situation,
          * since onDrawFrame() was called by system 60 times per second by default.
          */
-        if (sAnimationInterval <= 1.0 / 60 * Cocos2dxRenderer.NANOSECONDSPERSECOND) {
+        if (sAnimationInterval <= INTERVAL_60_FPS) {
             Cocos2dxRenderer.nativeRender();
         } else {
             final long now = System.nanoTime();
@@ -115,7 +172,7 @@ public class Cocos2dxRenderer implements GLSurfaceView.Renderer {
     private static native void nativeTouchesCancel(final int[] ids, final float[] xs, final float[] ys);
     private static native boolean nativeKeyEvent(final int keyCode,boolean isPressed);
     private static native void nativeRender();
-    private static native void nativeInit(final int width, final int height);
+    private static native void nativeInit(final int width, final int height, final String resourcePath);
     private static native void nativeOnSurfaceChanged(final int width, final int height);
     private static native void nativeOnPause();
     private static native void nativeOnResume();

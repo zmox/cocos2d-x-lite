@@ -39,7 +39,7 @@
 
 
 
-namespace cocos2d { namespace experimental {
+namespace cocos2d { 
 
 // ----------------------------------------------------------------------------
 
@@ -283,7 +283,7 @@ void AudioResampler::setSampleRate(int32_t inSampleRate) {
 }
 
 void AudioResampler::setVolume(float left, float right) {
-    // TODO: Implement anti-zipper filter
+    // REFINE: Implement anti-zipper filter
     // convert to U4.12 for internal integer use (round down)
     // integer volume values are clamped to 0 to UNITY_GAIN.
     mVolume[0] = u4_12_from_float(clampFloatVol(left));
@@ -785,4 +785,4 @@ void AudioResamplerOrder1::AsmStereo16Loop(int16_t *in, int32_t* maxOutPt, int32
 
 // ----------------------------------------------------------------------------
 
-}} // namespace cocos2d { namespace experimental {
+} // namespace cocos2d { 

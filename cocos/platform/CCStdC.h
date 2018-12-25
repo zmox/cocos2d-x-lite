@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2012 cocos2d-x.org
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -22,24 +23,61 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ****************************************************************************/
-
-#ifndef __PLATFORM_CCSTDC_H__
-#define __PLATFORM_CCSTDC_H__
+#pragma once
 
 #include "platform/CCPlatformConfig.h"
 
-#if CC_TARGET_PLATFORM == CC_PLATFORM_MAC
-#include "platform/mac/CCStdC-mac.h"
-#elif CC_TARGET_PLATFORM == CC_PLATFORM_IOS
-#include "platform/ios/CCStdC-ios.h"
-#elif CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID
-#include "platform/android/CCStdC-android.h"
-#elif CC_TARGET_PLATFORM == CC_PLATFORM_WIN32
-#include "platform/win32/CCStdC-win32.h"
-#elif CC_TARGET_PLATFORM == CC_PLATFORM_WINRT
-#include "platform/winrt/CCStdC.h"
-#elif CC_TARGET_PLATFORM == CC_PLATFORM_LINUX
-#include "platform/linux/CCStdC-linux.h"
-#endif
+#if CC_TARGET_PLATFORM == CC_PLATFORM_WIN32
 
-#endif /* __PLATFORM_CCSTDC_H__*/
+	#define WIN32_LEAN_AND_MEAN
+	#include <Windows.h>
+
+	#if _MSC_VER < 1800
+	#if !defined(isnan)
+	    #define isnan   _isnan
+	#endif
+	#endif
+
+	#include <math.h>
+	#include <string.h>
+	#include <stdarg.h>
+	#include <stdio.h>
+	#include <stdlib.h>
+	#include <time.h>
+
+	#if _MSC_VER >= 1600
+	    #include <stdint.h>
+	#else
+	    #include "platform/win32/compat/stdint.h"
+	#endif
+
+	// Conflicted with ParticleSystem::PositionType::RELATIVE, so we need to undef it.
+	#ifdef RELATIVE
+	#undef RELATIVE
+	#endif
+
+	// Conflicted with CCBReader::SizeType::RELATIVE and CCBReader::ScaleType::RELATIVE, so we need to undef it.
+	#ifdef ABSOLUTE
+	#undef ABSOLUTE
+	#endif
+
+	// Conflicted with HttpRequest::Type::DELETE, so we need to undef it.
+	#ifdef DELETE
+	#undef DELETE
+	#endif
+
+	#undef min
+	#undef max
+#else
+
+	#include <float.h>
+	#include <math.h>
+	#include <string.h>
+	#include <stdarg.h>
+	#include <stdio.h>
+	#include <stdlib.h>
+	#include <time.h>
+	#include <sys/time.h>
+	#include <stdint.h>
+
+#endif // CC_TARGET_PLATFORM == CC_PLATFORM_WIN32

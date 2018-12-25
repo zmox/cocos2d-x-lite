@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2013 cocos2d-x.org
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -29,7 +30,6 @@ THE SOFTWARE.
 
 #include "base/CCData.h"
 #include "base/ccMacros.h"
-#include "base/CCDirector.h"
 #include "platform/CCSAXParser.h"
 
 #include "tinyxml2/tinyxml2.h"
@@ -41,6 +41,7 @@ THE SOFTWARE.
 #include "unzip/unzip.h"
 #endif
 #include <sys/stat.h>
+#include <regex>
 
 NS_CC_BEGIN
 
@@ -87,6 +88,7 @@ public:
 public:
     DictMaker()
         : _resultType(SAX_RESULT_NONE)
+        , _state(SAX_NONE)
     {
     }
 
@@ -130,7 +132,7 @@ public:
         return _rootArray;
     }
 
-    void startElement(void *ctx, const char *name, const char **atts)
+    virtual void startElement(void *ctx, const char *name, const char **atts) override
     {
         CC_UNUSED_PARAM(ctx);
         CC_UNUSED_PARAM(atts);
@@ -221,7 +223,7 @@ public:
         }
     }
 
-    void endElement(void *ctx, const char *name)
+    virtual void endElement(void *ctx, const char *name) override
     {
         CC_UNUSED_PARAM(ctx);
         SAXState curState = _stateStack.empty() ? SAX_DICT : _stateStack.top();
@@ -293,7 +295,7 @@ public:
         _state = SAX_NONE;
     }
 
-    void textHandler(void *ctx, const char *ch, int len)
+    virtual void textHandler(void *ctx, const char *ch, int len) override
     {
         CC_UNUSED_PARAM(ctx);
         if (_state == SAX_NONE)
@@ -386,12 +388,12 @@ bool FileUtils::writeValueMapToFile(const ValueMap& dict, const std::string& ful
     doc->LinkEndChild(docType);
 
     tinyxml2::XMLElement *rootEle = doc->NewElement("plist");
-    rootEle->SetAttribute("version", "1.0");
     if (nullptr == rootEle)
     {
         delete doc;
         return false;
     }
+    rootEle->SetAttribute("version", "1.0");
     doc->LinkEndChild(rootEle);
 
     tinyxml2::XMLElement *innerDict = generateElementForDict(dict, doc);
@@ -426,12 +428,12 @@ bool FileUtils::writeValueVectorToFile(const ValueVector& vecData, const std::st
     doc->LinkEndChild(docType);
 
     tinyxml2::XMLElement *rootEle = doc->NewElement("plist");
-    rootEle->SetAttribute("version", "1.0");
     if (nullptr == rootEle)
     {
         delete doc;
         return false;
     }
+    rootEle->SetAttribute("version", "1.0");
     doc->LinkEndChild(rootEle);
 
     tinyxml2::XMLElement *innerDict = generateElementForArray(vecData, doc);
@@ -576,7 +578,8 @@ bool FileUtils::writeStringToFile(const std::string& dataStr, const std::string&
 
     bool rv = writeDataToFile(data, fullPath);
 
-    data.fastSet(nullptr, 0);
+    // need to give up buffer ownership for temp using, or double free will occur
+    data.takeBuffer();
     return rv;
 }
 
@@ -698,7 +701,7 @@ unsigned char* FileUtils::getFileDataFromZip(const std::string& zipFilePath, con
         file = unzOpen(FileUtils::getInstance()->getSuitableFOpen(zipFilePath).c_str());
         CC_BREAK_IF(!file);
 
-        // FIXME: Other platforms should use upstream minizip like mingw-w64
+        // IDEA: Other platforms should use upstream minizip like mingw-w64
         #ifdef MINIZIP_FROM_SYSTEM
         int ret = unzLocateFile(file, filename.c_str(), NULL);
         #else
@@ -778,7 +781,7 @@ std::string FileUtils::fullPathForFilename(const std::string &filename) const
 
     if (isAbsolutePath(filename))
     {
-        return filename;
+        return normalizePath(filename);
     }
 
     // Already Cached ?
@@ -805,12 +808,11 @@ std::string FileUtils::fullPathForFilename(const std::string &filename) const
                 _fullPathCache.insert(std::make_pair(filename, fullpath));
                 return fullpath;
             }
-
         }
     }
 
     if(isPopupNotify()){
-        CCLOG("cocos2d: fullPathForFilename: No file found at %s. Possible missing file.", filename.c_str());
+        CCLOG("fullPathForFilename: No file found at %s. Possible missing file.", filename.c_str());
     }
 
     // The file wasn't found, return empty string.
@@ -824,6 +826,11 @@ std::string FileUtils::fullPathFromRelativeFile(const std::string &filename, con
 
 void FileUtils::setSearchResolutionsOrder(const std::vector<std::string>& searchResolutionsOrder)
 {
+    if (_searchResolutionsOrderArray == searchResolutionsOrder)
+    {
+        return;
+    }
+
     bool existDefault = false;
     _fullPathCache.clear();
     _searchResolutionsOrderArray.clear();
@@ -872,41 +879,64 @@ const std::vector<std::string>& FileUtils::getSearchPaths() const
     return _searchPathArray;
 }
 
+const std::vector<std::string>& FileUtils::getOriginalSearchPaths() const
+{
+    return _originalSearchPaths;
+}
+
 void FileUtils::setWritablePath(const std::string& writablePath)
 {
     _writablePath = writablePath;
 }
 
+const std::string& FileUtils::getDefaultResourceRootPath() const
+{
+    return _defaultResRootPath;
+}
+
 void FileUtils::setDefaultResourceRootPath(const std::string& path)
 {
-    _defaultResRootPath = path;
+    if (_defaultResRootPath != path)
+    {
+        _fullPathCache.clear();
+        _defaultResRootPath = path;
+        if (!_defaultResRootPath.empty() && _defaultResRootPath[_defaultResRootPath.length()-1] != '/')
+        {
+            _defaultResRootPath += '/';
+        }
+
+        // Updates search paths
+        setSearchPaths(_originalSearchPaths);
+    }
 }
 
 void FileUtils::setSearchPaths(const std::vector<std::string>& searchPaths)
 {
     bool existDefaultRootPath = false;
+    _originalSearchPaths = searchPaths;
 
     _fullPathCache.clear();
     _searchPathArray.clear();
-    for (const auto& iter : searchPaths)
+
+    for (const auto& path : _originalSearchPaths)
     {
         std::string prefix;
-        std::string path;
+        std::string fullPath;
 
-        if (!isAbsolutePath(iter))
+        if (!isAbsolutePath(path))
         { // Not an absolute path
             prefix = _defaultResRootPath;
         }
-        path = prefix + (iter);
+        fullPath = prefix + path;
         if (!path.empty() && path[path.length()-1] != '/')
         {
-            path += "/";
+            fullPath += "/";
         }
         if (!existDefaultRootPath && path == _defaultResRootPath)
         {
             existDefaultRootPath = true;
         }
-        _searchPathArray.push_back(path);
+        _searchPathArray.push_back(fullPath);
     }
 
     if (!existDefaultRootPath)
@@ -928,8 +958,10 @@ void FileUtils::addSearchPath(const std::string &searchpath,const bool front)
         path += "/";
     }
     if (front) {
+        _originalSearchPaths.insert(_originalSearchPaths.begin(), searchpath);
         _searchPathArray.insert(_searchPathArray.begin(), path);
     } else {
+        _originalSearchPaths.push_back(searchpath);
         _searchPathArray.push_back(path);
     }
 }
@@ -952,7 +984,7 @@ void FileUtils::loadFilenameLookupDictionaryFromFile(const std::string &filename
             int version = metadata["version"].asInt();
             if (version != 1)
             {
-                CCLOG("cocos2d: ERROR: Invalid filenameLookup dictionary version: %d. Filename: %s", version, filename.c_str());
+                CCLOG("ERROR: Invalid filenameLookup dictionary version: %d. Filename: %s", version, filename.c_str());
                 return;
             }
             setFilenameLookupDictionary( dict["filenames"].asValueMap());
@@ -968,6 +1000,7 @@ std::string FileUtils::getFullPathForDirectoryAndFilename(const std::string& dir
         ret += '/';
     }
     ret += filename;
+    ret = normalizePath(ret);
 
     // if the file doesn't exist, return an empty string
     if (!isFileExistInternal(ret)) {
@@ -980,7 +1013,7 @@ bool FileUtils::isFileExist(const std::string& filename) const
 {
     if (isAbsolutePath(filename))
     {
-        return isFileExistInternal(filename);
+        return isFileExistInternal(normalizePath(filename));
     }
     else
     {
@@ -1003,7 +1036,7 @@ bool FileUtils::isDirectoryExist(const std::string& dirPath) const
 
     if (isAbsolutePath(dirPath))
     {
-        return isDirectoryExistInternal(dirPath);
+        return isDirectoryExistInternal(normalizePath(dirPath));
     }
 
     // Already Cached ?
@@ -1210,6 +1243,11 @@ long FileUtils::getFileSize(const std::string &filepath)
 #include <errno.h>
 #include <dirent.h>
 
+// android doesn't have ftw.h
+#if (CC_TARGET_PLATFORM != CC_PLATFORM_ANDROID)
+#include <ftw.h>
+#endif
+
 bool FileUtils::isDirectoryExistInternal(const std::string& dirPath) const
 {
     struct stat st;
@@ -1257,9 +1295,9 @@ bool FileUtils::createDirectory(const std::string& path)
 
     // Create path recursively
     subpath = "";
-    for (int i = 0; i < dirs.size(); ++i)
+    for (const auto& iter : dirs)
     {
-        subpath += dirs[i];
+        subpath += iter;
         dir = opendir(subpath.c_str());
 
         if (!dir)
@@ -1283,8 +1321,31 @@ bool FileUtils::createDirectory(const std::string& path)
     return true;
 }
 
+namespace
+{
+#if (CC_TARGET_PLATFORM != CC_PLATFORM_ANDROID)
+    int unlink_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
+    {
+        int rv = remove(fpath);
+        
+        if (rv)
+            perror(fpath);
+        
+        return rv;
+    }
+#endif
+}
+
 bool FileUtils::removeDirectory(const std::string& path)
 {
+#if !defined(CC_TARGET_OS_TVOS)
+
+#if (CC_TARGET_PLATFORM != CC_PLATFORM_ANDROID)
+    if (nftw(path.c_str(), unlink_cb, 64, FTW_DEPTH | FTW_PHYS) == -1)
+        return false;
+    else
+        return true;
+#else
     std::string command = "rm -r ";
     // Path may include space.
     command += "\"" + path + "\"";
@@ -1292,6 +1353,11 @@ bool FileUtils::removeDirectory(const std::string& path)
         return true;
     else
         return false;
+#endif // (CC_TARGET_PLATFORM != CC_PLATFORM_ANDROID)
+
+#else
+    return false;
+#endif // !defined(CC_TARGET_OS_TVOS)
 }
 
 bool FileUtils::removeFile(const std::string &path)
@@ -1397,6 +1463,39 @@ void FileUtils::valueMapCompact(ValueMap &valueMap)
 
 void FileUtils::valueVectorCompact(ValueVector &valueVector)
 {
+}
+
+std::string FileUtils::getFileDir(const std::string& path) const
+{
+    std::string ret;
+    size_t pos = path.rfind("/");
+    if (pos != std::string::npos)
+    {
+        ret = path.substr(0, pos);
+    }
+
+    normalizePath(ret);
+
+    return ret;
+}
+
+std::string FileUtils::normalizePath(const std::string& path) const
+{
+    std::string ret;
+    // Normalize: remove . and ..
+    ret = std::regex_replace(path, std::regex("/\\./"), "/");
+    ret = std::regex_replace(ret, std::regex("/\\.$"), "");
+
+    size_t pos;
+    while ((pos = ret.find("..")) != std::string::npos && pos > 2)
+    {
+        size_t prevSlash = ret.rfind("/", pos-2);
+        if (prevSlash == std::string::npos)
+            break;
+
+        ret = ret.replace(prevSlash, pos - prevSlash + 2 , "");
+    }
+    return ret;
 }
 
 NS_CC_END

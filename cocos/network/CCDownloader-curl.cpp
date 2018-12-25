@@ -1,5 +1,6 @@
 /****************************************************************************
  Copyright (c) 2015-2016 Chukong Technologies Inc.
+ Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos2d-x.org
 
@@ -21,22 +22,25 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  ****************************************************************************/
-
 #include "network/CCDownloader-curl.h"
 
 #include <set>
-
 #include <curl/curl.h>
+#include <deque>
 
-#include "base/CCDirector.h"
 #include "base/CCScheduler.h"
 #include "platform/CCFileUtils.h"
+#include "platform/CCApplication.h"
 #include "network/CCDownloader.h"
 
 // **NOTE**
 // In the file:
 // member function with suffix "Proc" designed called in DownloaderCURL::_threadProc
 // member function without suffix designed called in main thread
+
+#ifndef CC_CURL_POLL_TIMEOUT_MS
+#define CC_CURL_POLL_TIMEOUT_MS 50
+#endif
 
 namespace cocos2d { namespace network {
     using namespace std;
@@ -380,11 +384,14 @@ namespace cocos2d { namespace network {
             }
 
             static const long LOW_SPEED_LIMIT = 1;
-            static const long LOW_SPEED_TIME = 5;
+            static const long LOW_SPEED_TIME = 10;
             curl_easy_setopt(handle, CURLOPT_LOW_SPEED_LIMIT, LOW_SPEED_LIMIT);
             curl_easy_setopt(handle, CURLOPT_LOW_SPEED_TIME, LOW_SPEED_TIME);
 
-            static const int MAX_REDIRS = 2;
+            curl_easy_setopt(handle, CURLOPT_SSL_VERIFYHOST, false);
+            curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, false);
+
+            static const int MAX_REDIRS = 5;
             if (MAX_REDIRS)
             {
                 curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, true);
@@ -507,7 +514,7 @@ namespace cocos2d { namespace network {
                     // do wait action
                     if(maxfd == -1)
                     {
-                        this_thread::sleep_for(chrono::milliseconds(timeoutMS));
+                        this_thread::sleep_for(chrono::milliseconds(CC_CURL_POLL_TIMEOUT_MS));
                         rc = 0;
                     }
                     else
@@ -624,7 +631,8 @@ namespace cocos2d { namespace network {
                 }
 
                 // process tasks in _requestList
-                while (0 == countOfMaxProcessingTasks || coTaskMap.size() < countOfMaxProcessingTasks)
+                auto size = coTaskMap.size();
+                while (0 == countOfMaxProcessingTasks || size < countOfMaxProcessingTasks)
                 {
                     // get task wrapper from request queue
                     TaskWrapper wrapper;
@@ -701,8 +709,7 @@ namespace cocos2d { namespace network {
     {
         DLLOG("Construct DownloaderCURL %p", this);
         _impl->hints = hints;
-        _scheduler = Director::getInstance()->getScheduler();
-        _scheduler->retain();
+        _scheduler = Application::getInstance()->getScheduler();
 
         _transferDataToBuffer = [this](void *buf, int64_t len)->int64_t
         {
@@ -732,7 +739,6 @@ namespace cocos2d { namespace network {
     DownloaderCURL::~DownloaderCURL()
     {
         _scheduler->unschedule(_schedulerKey, this);
-        _scheduler->release();
 
         _impl->stop();
         DLLOG("Destruct DownloaderCURL %p", this);
@@ -749,6 +755,12 @@ namespace cocos2d { namespace network {
         _impl->run();
         _scheduler->resumeTarget(this);
         return coTask;
+    }
+
+    void DownloaderCURL::abort(const std::unique_ptr<IDownloadTask>& task) {
+        // REFINE
+        // https://github.com/cocos-creator/cocos2d-x-lite/pull/1291
+        DLLOG("%s isn't implemented!\n", __FUNCTION__);
     }
 
     void DownloaderCURL::_onSchedule(float)

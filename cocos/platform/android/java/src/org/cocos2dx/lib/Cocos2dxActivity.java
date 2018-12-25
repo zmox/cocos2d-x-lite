@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2013 cocos2d-x.org
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -29,21 +30,21 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.media.AudioManager;
 import android.opengl.GLSurfaceView;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.Message;
 import android.preference.PreferenceManager.OnActivityResultListener;
-import android.util.AttributeSet;
 import android.util.Log;
 import android.view.ViewGroup;
-import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
+import android.widget.TextView;
 
 import org.cocos2dx.lib.Cocos2dxHelper.Cocos2dxHelperListener;
 
@@ -61,22 +62,33 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
     // ===========================================================
     // Fields
     // ===========================================================
+    private static Cocos2dxActivity sContext = null;
+
+    protected RelativeLayout mFrameLayout = null;
     
     private Cocos2dxGLSurfaceView mGLSurfaceView = null;
     private int[] mGLContextAttrs = null;
-    private Cocos2dxHandler mHandler = null;   
-    private static Cocos2dxActivity sContext = null;
+    private Cocos2dxHandler mHandler = null;
     private Cocos2dxVideoHelper mVideoHelper = null;
     private Cocos2dxWebViewHelper mWebViewHelper = null;
-    private Cocos2dxEditBoxHelper mEditBoxHelper = null;
     private boolean hasFocus = false;
+    private Cocos2dxEditBox mEditBox = null;
 
-    public Cocos2dxGLSurfaceView getGLSurfaceView(){
-        return  mGLSurfaceView;
-    }
+    // DEBUG VIEW BEGIN
+    private LinearLayout mLinearLayoutForDebugView;
+    private TextView mFPSTextView;
+    private TextView mJSBInvocationTextView;
+    private TextView mGLOptModeTextView;
+    private TextView mGameInfoTextView_0;
+    private TextView mGameInfoTextView_1;
+    private TextView mGameInfoTextView_2;
+    // DEBUG VIEW END
 
-    public class Cocos2dxEGLConfigChooser implements GLSurfaceView.EGLConfigChooser
-    {
+    // ===========================================================
+    // Inner class
+    // ===========================================================
+
+    public class Cocos2dxEGLConfigChooser implements GLSurfaceView.EGLConfigChooser {
         protected int[] configAttribs;
         public Cocos2dxEGLConfigChooser(int redSize, int greenSize, int blueSize, int alphaSize, int depthSize, int stencilSize)
         {
@@ -97,7 +109,6 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
         }
 
         class ConfigValue implements Comparable<ConfigValue> {
-
             public EGLConfig config = null;
             public int[] configAttribs = null;
             public int value = 0;
@@ -227,8 +238,32 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
 
     }
 
+    // ===========================================================
+    // Member methods
+    // ===========================================================
+
+    public Cocos2dxGLSurfaceView getGLSurfaceView(){
+        return  mGLSurfaceView;
+    }
     public static Context getContext() {
         return sContext;
+    }
+
+    public void init() {
+        ViewGroup.LayoutParams frameLayoutParams =
+                new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                                           ViewGroup.LayoutParams.MATCH_PARENT);
+        mFrameLayout = new RelativeLayout(this);
+        mFrameLayout.setLayoutParams(frameLayoutParams);
+
+        Cocos2dxRenderer renderer = this.addSurfaceView();
+        this.addDebugInfo(renderer);
+
+        // Should create EditBox after adding SurfaceView, or EditBox will be hidden by SurfaceView.
+        mEditBox = new Cocos2dxEditBox(this, mFrameLayout);
+
+        // Set frame layout as the content view
+        setContentView(mFrameLayout);
     }
 
     public void setKeepScreenOn(boolean value) {
@@ -241,26 +276,41 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
         });
     }
 
-    protected void onLoadNativeLibraries() {
-        try {
-            ApplicationInfo ai = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
-            Bundle bundle = ai.metaData;
-            String libName = bundle.getString("android.app.lib_name");
-            System.loadLibrary(libName);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public Cocos2dxGLSurfaceView onCreateView() {
+        Cocos2dxGLSurfaceView glSurfaceView = new Cocos2dxGLSurfaceView(this);
+        //this line is need on some device if we specify an alpha bits
+        if(this.mGLContextAttrs[3] > 0) glSurfaceView.getHolder().setFormat(PixelFormat.TRANSLUCENT);
+
+        Cocos2dxEGLConfigChooser chooser = new Cocos2dxEGLConfigChooser(this.mGLContextAttrs);
+        glSurfaceView.setEGLConfigChooser(chooser);
+
+        return glSurfaceView;
     }
 
     // ===========================================================
-    // Constructors
+    // Override functions
     // ===========================================================
 
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
+        Log.d(TAG, "Cocos2dxActivity onCreate: " + this + ", savedInstanceState: " + savedInstanceState);
         super.onCreate(savedInstanceState);
 
-        this.hideVirtualButton();
+        Utils.setActivity(this);
+
+        // Workaround in https://stackoverflow.com/questions/16283079/re-launch-of-activity-on-home-button-but-only-the-first-time/16447508
+        if (!isTaskRoot()) {
+            // Android launched another instance of the root activity into an existing task
+            //  so just quietly finish and go away, dropping the user back into the activity
+            //  at the top of the stack (ie: the last state of this task)
+            finish();
+            Log.w(TAG, "[Workaround] Ignore the activity started from icon!");
+            return;
+        }
+
+        Utils.hideVirtualButton();
+
+        Cocos2dxHelper.registerBatteryLevelReceiver(this);
 
         onLoadNativeLibraries();
 
@@ -268,6 +318,7 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
         this.mHandler = new Cocos2dxHandler(this);
         
         Cocos2dxHelper.init(this);
+        CanvasRenderingContext2DImpl.init(this);
         
         this.mGLContextAttrs = getGLContextAttrs();
         this.init();
@@ -275,36 +326,22 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
         if (mVideoHelper == null) {
             mVideoHelper = new Cocos2dxVideoHelper(this, mFrameLayout);
         }
-        
+
         if(mWebViewHelper == null){
             mWebViewHelper = new Cocos2dxWebViewHelper(mFrameLayout);
         }
 
-        if(mEditBoxHelper == null){
-            mEditBoxHelper = new Cocos2dxEditBoxHelper(mFrameLayout);
-        }
-
         Window window = this.getWindow();
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         this.setVolumeControlStream(AudioManager.STREAM_MUSIC);
     }
-
-    //native method,call GLViewImpl::getGLContextAttrs() to get the OpenGL ES context attributions
-    private static native int[] getGLContextAttrs();
-    
-    // ===========================================================
-    // Getter & Setter
-    // ===========================================================
-
-    // ===========================================================
-    // Methods for/from SuperClass/Interfaces
-    // ===========================================================
 
     @Override
     protected void onResume() {
     	Log.d(TAG, "onResume()");
         super.onResume();
-        this.hideVirtualButton();
+        Cocos2dxAudioFocusManager.registerAudioFocusListener(this);
+        Utils.hideVirtualButton();
        	resumeIfHasFocus();
     }
 
@@ -319,7 +356,7 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
 
     private void resumeIfHasFocus() {
         if(hasFocus) {
-            this.hideVirtualButton();
+            Utils.hideVirtualButton();
             Cocos2dxHelper.onResume();
             mGLSurfaceView.onResume();
         }
@@ -329,13 +366,23 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
     protected void onPause() {
         Log.d(TAG, "onPause()");
         super.onPause();
+        Cocos2dxAudioFocusManager.unregisterAudioFocusListener(this);
         Cocos2dxHelper.onPause();
         mGLSurfaceView.onPause();
     }
 
     @Override
     protected void onDestroy() {
+        Cocos2dxAudioFocusManager.unregisterAudioFocusListener(this);
+        Cocos2dxHelper.unregisterBatteryLevelReceiver(this);;
+        CanvasRenderingContext2DImpl.destroy();
+
         super.onDestroy();
+
+        Log.d(TAG, "Cocos2dxActivity onDestroy: " + this + ", mGLSurfaceView" + mGLSurfaceView);
+        if (mGLSurfaceView != null) {
+            Cocos2dxHelper.terminateProcess();
+        }
     }
 
     @Override
@@ -347,8 +394,8 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
     }
     
     @Override
-    public void runOnGLThread(final Runnable pRunnable) {
-        this.mGLSurfaceView.queueEvent(pRunnable);
+    public void runOnGLThread(final Runnable runnable) {
+        this.mGLSurfaceView.queueEvent(runnable);
     }
 
     @Override
@@ -361,85 +408,168 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
         super.onActivityResult(requestCode, resultCode, data);
     }
 
-
-    protected ResizeLayout mFrameLayout = null;
     // ===========================================================
-    // Methods
+    // Protected and private methods
     // ===========================================================
-    public void init() {
-        
-        // FrameLayout
-        ViewGroup.LayoutParams framelayout_params =
-            new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                                       ViewGroup.LayoutParams.MATCH_PARENT);
 
-        mFrameLayout = new ResizeLayout(this);
+    protected void onLoadNativeLibraries() {
+        try {
+            ApplicationInfo ai = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
+            Bundle bundle = ai.metaData;
+            String libName = bundle.getString("android.app.lib_name");
+            System.loadLibrary(libName);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
-        mFrameLayout.setLayoutParams(framelayout_params);
-
-        // Cocos2dxEditText layout
-        ViewGroup.LayoutParams edittext_layout_params =
-            new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                                       ViewGroup.LayoutParams.WRAP_CONTENT);
-        Cocos2dxEditBox edittext = new Cocos2dxEditBox(this);
-        edittext.setLayoutParams(edittext_layout_params);
-
-
-        mFrameLayout.addView(edittext);
-
-        // Cocos2dxGLSurfaceView
+    private Cocos2dxRenderer addSurfaceView() {
         this.mGLSurfaceView = this.onCreateView();
-
-        // ...add to FrameLayout
-        mFrameLayout.addView(this.mGLSurfaceView);
-
+        // Should set to transparent, or it will hide EditText
+        // https://stackoverflow.com/questions/2978290/androids-edittext-is-hidden-when-the-virtual-keyboard-is-shown-and-a-surfacevie
+        mGLSurfaceView.setBackgroundColor(Color.TRANSPARENT);
         // Switch to supported OpenGL (ARGB888) mode on emulator
         if (isAndroidEmulator())
-           this.mGLSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
+            this.mGLSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
 
-        this.mGLSurfaceView.setCocos2dxRenderer(new Cocos2dxRenderer());
-        this.mGLSurfaceView.setCocos2dxEditText(edittext);
+        Cocos2dxRenderer renderer = new Cocos2dxRenderer();
+        this.mGLSurfaceView.setCocos2dxRenderer(renderer);
 
-        // Set framelayout as the content view
-        setContentView(mFrameLayout);
+        mFrameLayout.addView(this.mGLSurfaceView);
+
+        return renderer;
     }
 
-    public Cocos2dxGLSurfaceView onCreateView() {
-        Cocos2dxGLSurfaceView glSurfaceView = new Cocos2dxGLSurfaceView(this);
-        //this line is need on some device if we specify an alpha bits
-        if(this.mGLContextAttrs[3] > 0) glSurfaceView.getHolder().setFormat(PixelFormat.TRANSLUCENT);
+    private void addDebugInfo(Cocos2dxRenderer renderer) {
+        LinearLayout.LayoutParams linearLayoutParam = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+                                                                                    LinearLayout.LayoutParams.WRAP_CONTENT);
+        linearLayoutParam.setMargins(30, 0, 0, 0);
+        Cocos2dxHelper.setOnGameInfoUpdatedListener(new Cocos2dxHelper.OnGameInfoUpdatedListener() {
+            @Override
+            public void onFPSUpdated(float fps) {
+                Cocos2dxActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mFPSTextView != null) {
+                            mFPSTextView.setText("FPS: " + (int)Math.ceil(fps));
+                        }
+                    }
+                });
+            }
 
-        Cocos2dxEGLConfigChooser chooser = new Cocos2dxEGLConfigChooser(this.mGLContextAttrs);
-        glSurfaceView.setEGLConfigChooser(chooser);
+            @Override
+            public void onJSBInvocationCountUpdated(int count) {
+                Cocos2dxActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mJSBInvocationTextView != null) {
+                            mJSBInvocationTextView.setText("JSB: " + count);
+                        }
+                    }
+                });
+            }
 
-        return glSurfaceView;
-    }
+            @Override
+            public void onOpenDebugView() {
+                Cocos2dxActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mLinearLayoutForDebugView != null || mFrameLayout == null) {
+                            Log.e(TAG, "onOpenDebugView: failed!");
+                            return;
+                        }
 
-    protected void hideVirtualButton() {
+                        mLinearLayoutForDebugView = new LinearLayout(Cocos2dxActivity.this);
+                        mLinearLayoutForDebugView.setOrientation(LinearLayout.VERTICAL);
+                        mFrameLayout.addView(mLinearLayoutForDebugView);
 
-        if (Build.VERSION.SDK_INT >= 19) {
-            // use reflection to remove dependence of API level
+                        mFPSTextView = new TextView(Cocos2dxActivity.this);
+                        mFPSTextView.setBackgroundColor(Color.RED);
+                        mFPSTextView.setTextColor(Color.WHITE);
+                        mLinearLayoutForDebugView.addView(mFPSTextView, linearLayoutParam);
 
-            Class viewClass = View.class;
-            final int SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION = Cocos2dxReflectionHelper.<Integer>getConstantValue(viewClass, "SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION");
-            final int SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN = Cocos2dxReflectionHelper.<Integer>getConstantValue(viewClass, "SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN");
-            final int SYSTEM_UI_FLAG_HIDE_NAVIGATION = Cocos2dxReflectionHelper.<Integer>getConstantValue(viewClass, "SYSTEM_UI_FLAG_HIDE_NAVIGATION");
-            final int SYSTEM_UI_FLAG_FULLSCREEN = Cocos2dxReflectionHelper.<Integer>getConstantValue(viewClass, "SYSTEM_UI_FLAG_FULLSCREEN");
-            final int SYSTEM_UI_FLAG_IMMERSIVE_STICKY = Cocos2dxReflectionHelper.<Integer>getConstantValue(viewClass, "SYSTEM_UI_FLAG_IMMERSIVE_STICKY");
-            final int SYSTEM_UI_FLAG_LAYOUT_STABLE = Cocos2dxReflectionHelper.<Integer>getConstantValue(viewClass, "SYSTEM_UI_FLAG_LAYOUT_STABLE");
+                        mJSBInvocationTextView = new TextView(Cocos2dxActivity.this);
+                        mJSBInvocationTextView.setBackgroundColor(Color.GREEN);
+                        mJSBInvocationTextView.setTextColor(Color.WHITE);
+                        mLinearLayoutForDebugView.addView(mJSBInvocationTextView, linearLayoutParam);
 
-            // getWindow().getDecorView().setSystemUiVisibility();
-            final Object[] parameters = new Object[]{SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    | SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    | SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
-                    | SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
-                    | SYSTEM_UI_FLAG_IMMERSIVE_STICKY};
-            Cocos2dxReflectionHelper.<Void>invokeInstanceMethod(getWindow().getDecorView(),
-                    "setSystemUiVisibility",
-                    new Class[]{Integer.TYPE},
-                    parameters);
-        }
+                        mGLOptModeTextView = new TextView(Cocos2dxActivity.this);
+                        mGLOptModeTextView.setBackgroundColor(Color.BLUE);
+                        mGLOptModeTextView.setTextColor(Color.WHITE);
+                        mGLOptModeTextView.setText("GL Opt: Enabled");
+                        mLinearLayoutForDebugView.addView(mGLOptModeTextView, linearLayoutParam);
+
+                        mGameInfoTextView_0 = new TextView(Cocos2dxActivity.this);
+                        mGameInfoTextView_0.setBackgroundColor(Color.RED);
+                        mGameInfoTextView_0.setTextColor(Color.WHITE);
+                        mLinearLayoutForDebugView.addView(mGameInfoTextView_0, linearLayoutParam);
+
+                        mGameInfoTextView_1 = new TextView(Cocos2dxActivity.this);
+                        mGameInfoTextView_1.setBackgroundColor(Color.GREEN);
+                        mGameInfoTextView_1.setTextColor(Color.WHITE);
+                        mLinearLayoutForDebugView.addView(mGameInfoTextView_1, linearLayoutParam);
+
+                        mGameInfoTextView_2 = new TextView(Cocos2dxActivity.this);
+                        mGameInfoTextView_2.setBackgroundColor(Color.BLUE);
+                        mGameInfoTextView_2.setTextColor(Color.WHITE);
+                        mLinearLayoutForDebugView.addView(mGameInfoTextView_2, linearLayoutParam);
+                    }
+                });
+
+                renderer.showFPS();
+            }
+
+            @Override
+            public void onDisableBatchGLCommandsToNative() {
+                Cocos2dxActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mGLOptModeTextView != null) {
+                            mGLOptModeTextView.setText("GL Opt: Disabled");
+                        }
+                    }
+                });
+            }
+
+            @Override
+            public void onGameInfoUpdated_0(final String text) {
+
+                Cocos2dxActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mGameInfoTextView_0 != null) {
+                            mGameInfoTextView_0.setText(text);
+                        }
+                    }
+                });
+            }
+
+            @Override
+            public void onGameInfoUpdated_1(String text) {
+
+                Cocos2dxActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mGameInfoTextView_1 != null) {
+                            mGameInfoTextView_1.setText(text);
+                        }
+                    }
+                });
+            }
+
+            @Override
+            public void onGameInfoUpdated_2(String text) {
+
+                Cocos2dxActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mGameInfoTextView_2 != null) {
+                            mGameInfoTextView_2.setText(text);
+                        }
+                    }
+                });
+            }
+        });
     }
 
    private final static boolean isAndroidEmulator() {
@@ -456,6 +586,9 @@ public abstract class Cocos2dxActivity extends Activity implements Cocos2dxHelpe
    }
 
     // ===========================================================
-    // Inner and Anonymous Classes
+    // Native methods
     // ===========================================================
+
+    //native method,call GLViewImpl::getGLContextAttrs() to get the OpenGL ES context attributions
+    private static native int[] getGLContextAttrs();
 }

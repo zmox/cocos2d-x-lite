@@ -20,14 +20,14 @@
 #include <stdint.h>
 #include "audio/android/utils/Errors.h"
 
-namespace cocos2d { namespace experimental {
+namespace cocos2d { 
 // ----------------------------------------------------------------------------
 
 class AudioBufferProvider
 {
 public:
 
-    // FIXME merge with AudioTrackShared::Buffer, AudioTrack::Buffer, and AudioRecord::Buffer
+    // IDEA: merge with AudioTrackShared::Buffer, AudioTrack::Buffer, and AudioRecord::Buffer
     //       and rename getNextBuffer() to obtainBuffer()
     struct Buffer {
         Buffer() : raw(NULL), frameCount(0) { }
@@ -77,4 +77,4 @@ public:
 };
 
 // ----------------------------------------------------------------------------
-}} // namespace cocos2d { namespace experimental {
+} // namespace cocos2d { 

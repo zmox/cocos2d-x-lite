@@ -1,6 +1,7 @@
 /****************************************************************************
  Copyright (c) 2010-2012 cocos2d-x.org
  Copyright (c) 2013-2016 Chukong Technologies Inc.
+ Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
  
  http://www.cocos2d-x.org
  
@@ -27,35 +28,5 @@
 #define CCDevice_apple_hpp
 
 #include "platform/CCDevice.h"
-
-namespace FontUtils {
-    typedef struct
-    {
-        unsigned int height;
-        unsigned int width;
-        bool         isPremultipliedAlpha;
-        bool         hasShadow;
-        CGSize       shadowOffset;
-        float        shadowBlur;
-        float        shadowOpacity;
-        bool         hasStroke;
-        float        strokeColorR;
-        float        strokeColorG;
-        float        strokeColorB;
-        float        strokeColorA;
-        float        strokeSize;
-        float        tintColorR;
-        float        tintColorG;
-        float        tintColorB;
-        float        tintColorA;
-        
-        unsigned char*  data;
-        
-    } tImageInfo;
-    
-    NSMutableParagraphStyle* _calculateParagraphStyle(bool enableWrap, int overflow);
-    NSTextAlignment _calculateTextAlignment(cocos2d::Device::TextAlign align);
-    CGFloat _calculateTextDrawStartWidth(cocos2d::Device::TextAlign align, CGSize realDimensions, CGSize dimensions);
-}
 
 #endif /* CCDevice_apple_hpp */

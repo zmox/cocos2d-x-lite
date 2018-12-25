@@ -1,5 +1,6 @@
 /****************************************************************************
  Copyright (c) 2014-2016 Chukong Technologies Inc.
+ Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos2d-x.org
 
@@ -37,7 +38,6 @@
 NS_CC_BEGIN
 class Scheduler;
 
-namespace experimental{
 #define MAX_AUDIOINSTANCES 24
 
 class AudioEngineImpl : public cocos2d::Ref
@@ -66,11 +66,14 @@ public:
 
 private:
     void _play2d(AudioCache *cache, int audioID);
+    ALuint findValidSource();
+
+    static ALvoid myAlSourceNotificationCallback(ALuint sid, ALuint notificationID, ALvoid* userData);
 
     ALuint _alSources[MAX_AUDIOINSTANCES];
 
     //source,used
-    std::unordered_map<ALuint, bool> _alSourceUsed;
+    std::list<ALuint> _unusedSourcesPool;
 
     //filePath,bufferInfo
     std::unordered_map<std::string, AudioCache> _audioCaches;
@@ -84,7 +87,6 @@ private:
     int _currentAudioID;
     Scheduler* _scheduler;
 };
-}
 NS_CC_END
 #endif // __AUDIO_ENGINE_INL_H_
 #endif

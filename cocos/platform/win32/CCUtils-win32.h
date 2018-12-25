@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2012 cocos2d-x.org
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -26,7 +27,7 @@ THE SOFTWARE.
 #ifndef __CC_UTILS_WIN32_H__
 #define __CC_UTILS_WIN32_H__
 
-#include "platform/CCPlatformMacros.h"
+#include "base/ccMacros.h"
 
 #include <string>
 

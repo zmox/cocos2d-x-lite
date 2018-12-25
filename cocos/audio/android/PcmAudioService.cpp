@@ -1,5 +1,6 @@
 /****************************************************************************
 Copyright (c) 2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -27,7 +28,7 @@ THE SOFTWARE.
 #include "audio/android/PcmAudioService.h"
 #include "audio/android/AudioMixerController.h"
 
-namespace cocos2d { namespace experimental {
+namespace cocos2d { 
 
 static std::vector<char> __silenceData;
 
@@ -87,7 +88,7 @@ bool PcmAudioService::enqueue()
 
 void PcmAudioService::bqFetchBufferCallback(SLAndroidSimpleBufferQueueItf bq)
 {
-    // FIXME: PcmAudioService instance may be destroyed, we need to find a way to wait...
+    // IDEA: PcmAudioService instance may be destroyed, we need to find a way to wait...
     // It's in sub thread
     enqueue();
 }
@@ -189,4 +190,4 @@ void PcmAudioService::resume()
     SL_RETURN_IF_FAILED(r, "PcmAudioService::resume failed");
 }
 
-}} // namespace cocos2d { namespace experimental {
+} // namespace cocos2d { 

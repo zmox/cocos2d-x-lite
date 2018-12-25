@@ -2,6 +2,7 @@
 Copyright (c) 2010-2012 cocos2d-x.org
 Copyright (c) 2011      Zynga Inc.
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -32,7 +33,6 @@ THE SOFTWARE.
 #include <string>
 #include <stack>
 
-#include "base/CCDirector.h"
 #include "platform/CCFileUtils.h"
 #include "platform/CCSAXParser.h"
 
@@ -314,9 +314,24 @@ std::string FileUtilsApple::getFullPathForDirectoryAndFilename(const std::string
 {
     if (directory[0] != '/')
     {
+        NSString* dirStr = [NSString stringWithUTF8String:directory.c_str()];
+        // The following logic is used for remove the "../" in the directory
+        // Because method "pathForResource" will return nil if the directory contains "../".
+        auto theIdx = directory.find("..");
+        if (theIdx != std::string::npos && theIdx > 0) {
+            NSMutableArray<NSString *>* pathComps = [NSMutableArray arrayWithArray:[dirStr pathComponents]];
+            NSUInteger idx = [pathComps indexOfObject:@".."];
+            while (idx != NSNotFound && idx > 0) {          // if found ".." & it's not at the beginning of the string
+                [pathComps removeObjectAtIndex: idx];       // remove the item ".."
+                [pathComps removeObjectAtIndex: idx - 1];   // remove the item before ".."
+                idx = [pathComps indexOfObject:@".."];      // find ".." again
+            }
+            dirStr = [NSString pathWithComponents:pathComps];
+        }
+
         NSString* fullpath = [pimpl_->getBundle() pathForResource:[NSString stringWithUTF8String:filename.c_str()]
                                                              ofType:nil
-                                                        inDirectory:[NSString stringWithUTF8String:directory.c_str()]];
+                                                        inDirectory:dirStr];
         if (fullpath != nil) {
             return [fullpath UTF8String];
         }

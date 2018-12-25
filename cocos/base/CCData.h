@@ -1,6 +1,7 @@
 /****************************************************************************
  Copyright (c) 2010-2012 cocos2d-x.org
  Copyright (c) 2013-2016 Chukong Technologies Inc.
+ Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos2d-x.org
 
@@ -26,7 +27,7 @@
 #ifndef __CCDATA_H__
 #define __CCDATA_H__
 
-#include "platform/CCPlatformMacros.h"
+#include "base/ccMacros.h"
 #include <stdint.h> // for ssize_t on android
 #include <string>   // for ssize_t on linux
 #include "platform/CCStdC.h" // for ssize_t on window
@@ -140,7 +141,7 @@ public:
      * @param size Will fill with the data buffer size in bytes, if you do not care buffer size, pass nullptr.
      * @return the internal data buffer, free it after use.
      */
-    unsigned char* takeBuffer(ssize_t* size);
+    unsigned char* takeBuffer(ssize_t* size = nullptr);
 private:
     void move(Data& other);
 

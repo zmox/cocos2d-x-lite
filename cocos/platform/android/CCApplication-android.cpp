@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2012 cocos2d-x.org
-Copyright (c) 2013-2014 Chukong Technologies Inc.
+Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -22,92 +23,133 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ****************************************************************************/
-
-#include "platform/CCPlatformConfig.h"
-#if CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID
-
-#include "platform/android/jni/JniHelper.h"
 #include "platform/CCApplication.h"
-#include "base/CCDirector.h"
-#include <android/log.h>
-#include <jni.h>
+#include <EGL/egl.h>
 #include <cstring>
+#include "platform/android/jni/JniImp.h"
+#include "platform/android/CCGL-android.h"
+#include "base/CCScheduler.h"
+#include "base/CCConfiguration.h"
+#include "audio/include/AudioEngine.h"
+#include "scripting/js-bindings/jswrapper/SeApi.h"
+#include "scripting/js-bindings/event/EventDispatcher.h"
 
-#define  LOG_TAG    "CCApplication_android Debug"
-#define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
+#define  LOG_APP_TAG    "CCApplication_android Debug"
+#define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,LOG_APP_TAG,__VA_ARGS__)
 
-// FIXME: using ndk-r10c will cause the next function could not be found. It may be a bug of ndk-r10c.
+// IDEA: using ndk-r10c will cause the next function could not be found. It may be a bug of ndk-r10c.
 // Here is the workaround method to fix the problem.
 #ifdef __aarch64__
-extern "C" size_t __ctype_get_mb_cur_max(void) {
+extern "C" size_t __ctype_get_mb_cur_max(void)
+{
     return (size_t) sizeof(wchar_t);
 }
 #endif
 
-static const std::string helperClassName = "org/cocos2dx/lib/Cocos2dxHelper";
+PFNGLGENVERTEXARRAYSOESPROC glGenVertexArraysOESEXT = 0;
+PFNGLBINDVERTEXARRAYOESPROC glBindVertexArrayOESEXT = 0;
+PFNGLDELETEVERTEXARRAYSOESPROC glDeleteVertexArraysOESEXT = 0;
 
 NS_CC_BEGIN
 
-// sharedApplication pointer
-Application * Application::sm_pSharedApplication = nullptr;
+Application* Application::_instance = nullptr;
+std::shared_ptr<Scheduler> Application::_scheduler = nullptr;
 
-Application::Application()
+Application::Application(const std::string& name, int width, int height)
 {
-    CCAssert(! sm_pSharedApplication, "");
-    sm_pSharedApplication = this;
+    Application::_instance = this;
+    Configuration::getInstance();
+
+    _scheduler = std::make_shared<Scheduler>();
+
+    PFNGLGENVERTEXARRAYSOESPROC glGenVertexArraysOESEXT = (PFNGLGENVERTEXARRAYSOESPROC)eglGetProcAddress("glGenVertexArraysOES");
+    PFNGLBINDVERTEXARRAYOESPROC glBindVertexArrayOESEXT = (PFNGLBINDVERTEXARRAYOESPROC)eglGetProcAddress("glBindVertexArrayOES");
+    PFNGLDELETEVERTEXARRAYSOESPROC glDeleteVertexArraysOESEXT = (PFNGLDELETEVERTEXARRAYSOESPROC)eglGetProcAddress("glDeleteVertexArraysOES");
+
+    _renderTexture = new RenderTexture(width, height);
 }
 
 Application::~Application()
 {
-    CCAssert(this == sm_pSharedApplication, "");
-    sm_pSharedApplication = nullptr;
+#if USE_AUDIO
+    AudioEngine::end();
+#endif
+
+    EventDispatcher::destroy();
+    se::ScriptEngine::destroyInstance();
+
+    delete _renderTexture;
+    _renderTexture = nullptr;
+
+    Application::_instance = nullptr;
 }
 
-int Application::run()
+void Application::start()
 {
-    // Initialize instance and cocos2d.
-    if (! applicationDidFinishLaunching())
-    {
-        return 0;
-    }
-
-    return -1;
+    if(!applicationDidFinishLaunching())
+        return;
 }
 
-void Application::setAnimationInterval(float interval) {
-    JniHelper::callStaticVoidMethod("org/cocos2dx/lib/Cocos2dxRenderer", "setAnimationInterval", interval);
-}
-
-//////////////////////////////////////////////////////////////////////////
-// static member function
-//////////////////////////////////////////////////////////////////////////
-Application* Application::getInstance()
+void Application::restart()
 {
-    CCAssert(sm_pSharedApplication, "");
-    return sm_pSharedApplication;
+    restartJSVM();
 }
 
-void Application::destroyInstance()
+void Application::end()
 {
-    if (sm_pSharedApplication != nullptr)
-    {
-        delete sm_pSharedApplication;
-        sm_pSharedApplication = nullptr;
-    }
+    exitApplication();
 }
 
-const char * Application::getCurrentLanguageCode()
+void Application::setMultitouch(bool /*value*/)
 {
-    static char code[3]={0};
-    std::string language = JniHelper::callStaticStringMethod(helperClassName, "getCurrentLanguage");
-    strncpy(code, language.c_str(), 2);
-    code[2]='\0';
-    return code;
+
 }
 
-LanguageType Application::getCurrentLanguage()
+bool Application::applicationDidFinishLaunching()
 {
-    std::string languageName = JniHelper::callStaticStringMethod(helperClassName, "getCurrentLanguage");
+    return true;
+}
+
+void Application::applicationDidEnterBackground()
+{
+
+}
+
+void Application::applicationWillEnterForeground()
+{
+
+}
+
+void Application::setPreferredFramesPerSecond(int fps)
+{
+    _fps = fps;
+    setPreferredFramesPerSecondJNI(_fps);
+}
+
+std::string Application::getCurrentLanguageCode() const
+{
+    std::string language = getCurrentLanguageJNI();
+    return language.substr(0, 2);
+}
+
+bool Application::isDisplayStats() {
+    se::AutoHandleScope hs;
+    se::Value ret;
+    char commandBuf[100] = "cc.debug.isDisplayStats();";
+    se::ScriptEngine::getInstance()->evalString(commandBuf, 100, &ret);
+    return ret.toBoolean();
+}
+
+void Application::setDisplayStats(bool isShow) {
+    se::AutoHandleScope hs;
+    char commandBuf[100] = {0};
+    sprintf(commandBuf, "cc.debug.setDisplayStats(%s);", isShow ? "true" : "false");
+    se::ScriptEngine::getInstance()->evalString(commandBuf);
+}
+
+Application::LanguageType Application::getCurrentLanguage() const
+{
+    std::string languageName = getCurrentLanguageJNI();
     const char* pLanguageName = languageName.c_str();
     LanguageType ret = LanguageType::ENGLISH;
 
@@ -190,25 +232,34 @@ LanguageType Application::getCurrentLanguage()
     return ret;
 }
 
-Application::Platform Application::getTargetPlatform()
+Application::Platform Application::getPlatform() const
 {
-    return Platform::OS_ANDROID;
+    return Platform::ANDROIDOS;
 }
 
-std::string Application::getVersion()
+float Application::getScreenScale() const
 {
-    return JniHelper::callStaticStringMethod(helperClassName, "getVersion");
+    return 1.f;
+}
+
+GLint Application::getMainFBO() const
+{
+    return _mainFBO;
+}
+
+void Application::onCreateView(PixelFormat& /*pixelformat*/, DepthFormat& /*depthFormat*/, int& /*multisamplingCount*/)
+{
+
 }
 
 bool Application::openURL(const std::string &url)
 {
-    return JniHelper::callStaticBooleanMethod(helperClassName, "openURL", url);
+    return openURLJNI(url);
 }
 
-void Application::applicationScreenSizeChanged(int newWidth, int newHeight) {
-
+std::string Application::getSystemVersion()
+{
+    return getSystemVersionJNI();
 }
 
 NS_CC_END
-
-#endif // CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID

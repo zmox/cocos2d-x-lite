@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2013 cocos2d-x.org
 Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -24,17 +25,13 @@ THE SOFTWARE.
  ****************************************************************************/
 package org.cocos2dx.lib;
 
-import android.app.Activity;
 import android.content.Context;
 import android.opengl.GLSurfaceView;
 import android.os.Handler;
-import android.os.Message;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
-import android.view.View;
-import android.view.inputmethod.InputMethodManager;
 
 public class Cocos2dxGLSurfaceView extends GLSurfaceView {
     // ===========================================================
@@ -50,25 +47,12 @@ public class Cocos2dxGLSurfaceView extends GLSurfaceView {
     // Fields
     // ===========================================================
 
-    // TODO Static handler -> Potential leak!
+    // REFINE: Static handler -> Potential leak!
     private static Handler sHandler;
-
     private static Cocos2dxGLSurfaceView mCocos2dxGLSurfaceView;
-    private static Cocos2dxTextInputWrapper sCocos2dxTextInputwrapper;
 
     private Cocos2dxRenderer mCocos2dxRenderer;
-    private Cocos2dxEditBox mCocos2dxEditText;
-
-    public boolean isSoftKeyboardShown() {
-        return mSoftKeyboardShown;
-    }
-
-    public void setSoftKeyboardShown(boolean softKeyboardShown) {
-        this.mSoftKeyboardShown = softKeyboardShown;
-    }
-
-    private boolean mSoftKeyboardShown = false;
-
+    private boolean mStopHandleTouchAndKeyEvents = false;
 
     // ===========================================================
     // Constructors
@@ -91,40 +75,6 @@ public class Cocos2dxGLSurfaceView extends GLSurfaceView {
         this.setFocusableInTouchMode(true);
 
         Cocos2dxGLSurfaceView.mCocos2dxGLSurfaceView = this;
-        Cocos2dxGLSurfaceView.sCocos2dxTextInputwrapper = new Cocos2dxTextInputWrapper(this);
-
-        Cocos2dxGLSurfaceView.sHandler = new Handler() {
-            @Override
-            public void handleMessage(final Message msg) {
-                switch (msg.what) {
-                    case HANDLER_OPEN_IME_KEYBOARD:
-                        if (null != Cocos2dxGLSurfaceView.this.mCocos2dxEditText && Cocos2dxGLSurfaceView.this.mCocos2dxEditText.requestFocus()) {
-                            Cocos2dxGLSurfaceView.this.mCocos2dxEditText.removeTextChangedListener(Cocos2dxGLSurfaceView.sCocos2dxTextInputwrapper);
-                            Cocos2dxGLSurfaceView.this.mCocos2dxEditText.setText("");
-                            final String text = (String) msg.obj;
-                            Cocos2dxGLSurfaceView.this.mCocos2dxEditText.append(text);
-                            Cocos2dxGLSurfaceView.sCocos2dxTextInputwrapper.setOriginText(text);
-                            Cocos2dxGLSurfaceView.this.mCocos2dxEditText.addTextChangedListener(Cocos2dxGLSurfaceView.sCocos2dxTextInputwrapper);
-                            final InputMethodManager imm = (InputMethodManager) Cocos2dxGLSurfaceView.mCocos2dxGLSurfaceView.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-                            imm.showSoftInput(Cocos2dxGLSurfaceView.this.mCocos2dxEditText, 0);
-                            Log.d("GLSurfaceView", "showSoftInput");
-                        }
-                        break;
-
-                    case HANDLER_CLOSE_IME_KEYBOARD:
-                        if (null != Cocos2dxGLSurfaceView.this.mCocos2dxEditText) {
-                            Cocos2dxGLSurfaceView.this.mCocos2dxEditText.removeTextChangedListener(Cocos2dxGLSurfaceView.sCocos2dxTextInputwrapper);
-                            final InputMethodManager imm = (InputMethodManager) Cocos2dxGLSurfaceView.mCocos2dxGLSurfaceView.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-                            imm.hideSoftInputFromWindow(Cocos2dxGLSurfaceView.this.mCocos2dxEditText.getWindowToken(), 0);
-                            Cocos2dxGLSurfaceView.this.requestFocus();
-                            // can take effect after GLSurfaceView has focus
-                            ((Cocos2dxActivity)Cocos2dxGLSurfaceView.mCocos2dxGLSurfaceView.getContext()).hideVirtualButton();
-                            Log.d("GLSurfaceView", "HideSoftInput");
-                        }
-                        break;
-                }
-            }
-        };
     }
 
     // ===========================================================
@@ -136,12 +86,12 @@ public class Cocos2dxGLSurfaceView extends GLSurfaceView {
        return mCocos2dxGLSurfaceView;
        }
 
-       public static void queueAccelerometer(final float x, final float y, final float z, final long timestamp) {   
-       mCocos2dxGLSurfaceView.queueEvent(new Runnable() {
-        @Override
-            public void run() {
-                Cocos2dxAccelerometer.onSensorChanged(x, y, z, timestamp);
-        }
+       public static void queueAccelerometer(final float x, final float y, final float z, final long timestamp) {
+           mCocos2dxGLSurfaceView.queueEvent(new Runnable() {
+            @Override
+                public void run() {
+                    Cocos2dxAccelerometer.onSensorChanged(x, y, z, timestamp);
+            }
         });
     }
 
@@ -152,18 +102,6 @@ public class Cocos2dxGLSurfaceView extends GLSurfaceView {
 
     private String getContentText() {
         return this.mCocos2dxRenderer.getContentText();
-    }
-
-    public Cocos2dxEditBox getCocos2dxEditText() {
-        return this.mCocos2dxEditText;
-    }
-
-    public void setCocos2dxEditText(final Cocos2dxEditBox pCocos2dxEditText) {
-        this.mCocos2dxEditText = pCocos2dxEditText;
-        if (null != this.mCocos2dxEditText && null != Cocos2dxGLSurfaceView.sCocos2dxTextInputwrapper) {
-            this.mCocos2dxEditText.setOnEditorActionListener(Cocos2dxGLSurfaceView.sCocos2dxTextInputwrapper);
-            this.requestFocus();
-        }
     }
 
     // ===========================================================
@@ -202,14 +140,6 @@ public class Cocos2dxGLSurfaceView extends GLSurfaceView {
         final float[] xs = new float[pointerNumber];
         final float[] ys = new float[pointerNumber];
 
-        if (mSoftKeyboardShown){
-            InputMethodManager imm = (InputMethodManager)this.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            View view = ((Activity)this.getContext()).getCurrentFocus();
-            imm.hideSoftInputFromWindow(view.getWindowToken(),0);
-            this.requestFocus();
-            mSoftKeyboardShown = false;
-        }
-
         for (int i = 0; i < pointerNumber; i++) {
             ids[i] = pMotionEvent.getPointerId(i);
             xs[i] = pMotionEvent.getX(i);
@@ -218,6 +148,11 @@ public class Cocos2dxGLSurfaceView extends GLSurfaceView {
 
         switch (pMotionEvent.getAction() & MotionEvent.ACTION_MASK) {
             case MotionEvent.ACTION_POINTER_DOWN:
+                if (mStopHandleTouchAndKeyEvents) {
+                    Cocos2dxEditBox.complete();
+                    return true;
+                }
+
                 final int indexPointerDown = pMotionEvent.getAction() >> MotionEvent.ACTION_POINTER_INDEX_SHIFT;
                 final int idPointerDown = pMotionEvent.getPointerId(indexPointerDown);
                 final float xPointerDown = pMotionEvent.getX(indexPointerDown);
@@ -232,6 +167,11 @@ public class Cocos2dxGLSurfaceView extends GLSurfaceView {
                 break;
 
             case MotionEvent.ACTION_DOWN:
+                if (mStopHandleTouchAndKeyEvents) {
+                    Cocos2dxEditBox.complete();
+                    return true;
+                }
+
                 // there are only one finger on the screen
                 final int idDown = pMotionEvent.getPointerId(0);
                 final float xDown = xs[0];
@@ -364,40 +304,13 @@ public class Cocos2dxGLSurfaceView extends GLSurfaceView {
     // Methods
     // ===========================================================
 
+    public void setStopHandleTouchAndKeyEvents(boolean value) {
+        mStopHandleTouchAndKeyEvents = value;
+    }
+
     // ===========================================================
     // Inner and Anonymous Classes
     // ===========================================================
-
-    public static void openIMEKeyboard() {
-        final Message msg = new Message();
-        msg.what = Cocos2dxGLSurfaceView.HANDLER_OPEN_IME_KEYBOARD;
-        msg.obj = Cocos2dxGLSurfaceView.mCocos2dxGLSurfaceView.getContentText();
-        Cocos2dxGLSurfaceView.sHandler.sendMessage(msg);
-    }
-
-    public static void closeIMEKeyboard() {
-        final Message msg = new Message();
-        msg.what = Cocos2dxGLSurfaceView.HANDLER_CLOSE_IME_KEYBOARD;
-        Cocos2dxGLSurfaceView.sHandler.sendMessage(msg);
-    }
-
-    public void insertText(final String pText) {
-        this.queueEvent(new Runnable() {
-            @Override
-            public void run() {
-                Cocos2dxGLSurfaceView.this.mCocos2dxRenderer.handleInsertText(pText);
-            }
-        });
-    }
-
-    public void deleteBackward() {
-        this.queueEvent(new Runnable() {
-            @Override
-            public void run() {
-                Cocos2dxGLSurfaceView.this.mCocos2dxRenderer.handleDeleteBackward();
-            }
-        });
-    }
 
     private static void dumpMotionEvent(final MotionEvent event) {
         final String names[] = { "DOWN", "UP", "MOVE", "CANCEL", "OUTSIDE", "POINTER_DOWN", "POINTER_UP", "7?", "8?", "9?" };

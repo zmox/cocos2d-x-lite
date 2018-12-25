@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2012 cocos2d-x.org
-Copyright (c) 2013-2014 Chukong Technologies Inc.
+Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -36,7 +37,7 @@ THE SOFTWARE.
 #define CC_NO_MESSAGE_PSEUDOASSERT(cond)                        \
     if (!(cond)) {                                              \
         __android_log_print(ANDROID_LOG_ERROR,                  \
-                            "cocos2d-x assert",                 \
+                            "assert",                 \
                             "%s function:%s line:%d",           \
                             __FILE__, __FUNCTION__, __LINE__);  \
     }
@@ -44,7 +45,7 @@ THE SOFTWARE.
 #define CC_MESSAGE_PSEUDOASSERT(cond, msg)                          \
     if (!(cond)) {                                                  \
         __android_log_print(ANDROID_LOG_ERROR,                      \
-                            "cocos2d-x assert",                     \
+                            "assert",                     \
                             "file:%s function:%s line:%d, %s",      \
                             __FILE__, __FUNCTION__, __LINE__, msg); \
     }

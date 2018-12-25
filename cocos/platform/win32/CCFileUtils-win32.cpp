@@ -1,6 +1,7 @@
 /****************************************************************************
 Copyright (c) 2010-2012 cocos2d-x.org
-Copyright (c) 2013-2014 Chukong Technologies Inc.
+Copyright (c) 2013-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -28,7 +29,6 @@ THE SOFTWARE.
 
 #include "platform/win32/CCFileUtils-win32.h"
 #include "platform/win32/CCUtils-win32.h"
-#include "platform/CCCommon.h"
 #include <Shlobj.h>
 #include <cstdlib>
 #include <regex>

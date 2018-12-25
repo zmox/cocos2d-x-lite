@@ -1,5 +1,7 @@
 /****************************************************************************
  Copyright (c) 2015-2016 cocos2d-x.org
+ Copyright (c) 2013-2016 Chukong Technologies Inc.
+ Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos2d-x.org
 
@@ -25,15 +27,9 @@
 #include "network/CCDownloader.h"
 
 // include platform specific implement class
-#if (CC_TARGET_PLATFORM == CC_PLATFORM_MAC)
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_MAC || CC_TARGET_PLATFORM == CC_PLATFORM_IOS)
 
-#include "network/CCDownloader-apple.h"
-#include "network/CCDownloader-curl.h"
-#define DownloaderImpl  DownloaderCURL
-
-#elif (CC_TARGET_PLATFORM == CC_PLATFORM_IOS)
-
-#include "network/CCDownloader-apple.h"
+#include "network/CCDownloaderImpl-apple.h"
 #define DownloaderImpl  DownloaderApple
 
 #elif (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
@@ -81,7 +77,7 @@ namespace cocos2d { namespace network {
                                        int64_t bytesReceived,
                                        int64_t totalBytesReceived,
                                        int64_t totalBytesExpected,
-                                       std::function<int64_t(void *buffer, int64_t len)>& transferDataToBuffer)
+                                       std::function<int64_t(void *buffer, int64_t len)>& /*transferDataToBuffer*/)
         {
             if (onTaskProgress)
             {
@@ -153,6 +149,7 @@ namespace cocos2d { namespace network {
 
     std::shared_ptr<const DownloadTask> Downloader::createDownloadFileTask(const std::string& srcUrl,
                                                                            const std::string& storagePath,
+                                                                           const std::map<std::string, std::string> &header,
                                                                            const std::string& identifier/* = ""*/)
     {
         DownloadTask *task_ = new (std::nothrow) DownloadTask();
@@ -162,6 +159,7 @@ namespace cocos2d { namespace network {
             task_->requestURL    = srcUrl;
             task_->storagePath   = storagePath;
             task_->identifier    = identifier;
+            task_->header        = header;
             if (0 == srcUrl.length() || 0 == storagePath.length())
             {
                 if (onTaskError)
@@ -176,7 +174,16 @@ namespace cocos2d { namespace network {
 
         return task;
     }
+    std::shared_ptr<const DownloadTask> Downloader::createDownloadFileTask(const std::string& srcUrl,
+                                                                           const std::string& storagePath,
+                                                                           const std::string& identifier/* = ""*/) {
+        const std::map<std::string, std::string> emptyHeader;
+        return createDownloadFileTask(srcUrl, storagePath, emptyHeader, identifier);
+    }
 
+    void Downloader::abort(const DownloadTask& task) {
+        _impl->abort(task._coTask);
+    }
 //std::string Downloader::getFileNameFromUrl(const std::string& srcUrl)
 //{
 //    // Find file name and file extension

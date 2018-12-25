@@ -28,7 +28,11 @@ THE SOFTWARE.
 /// @cond DO_NOT_SHOW
 
 #include "base/CCRef.h"
-#include "renderer/CCTexture2D.h"
+#include "platform/CCGL.h"
+#include "platform/CCStdC.h"
+
+#include <string>
+#include <map>
 
 // premultiply alpha, or the effect will wrong when want to use other pixel format in Texture2D,
 // such as RGB888, RGB5A1
@@ -50,24 +54,18 @@ NS_CC_BEGIN
  */
 typedef struct _MipmapInfo
 {
-    unsigned char* address;
-    int len;
-    _MipmapInfo():address(NULL),len(0){}
+    unsigned char* address = nullptr;
+    int offset = 0;
+    int len = 0;
 }MipmapInfo;
 
-class CC_DLL Image : public Ref
+class Image : public Ref
 {
 public:
-    friend class TextureCache;
     /**
      * @js ctor
      */
     Image();
-    /**
-     * @js NA
-     * @lua NA
-     */
-    virtual ~Image();
 
     /** Supported formats for Image */
     enum class Format
@@ -85,7 +83,7 @@ public:
         //! ETC
         ETC,
         //! S3TC
-//        S3TC,
+        S3TC,
         //! ATITC
 //        ATITC,
         //! TGA
@@ -95,6 +93,80 @@ public:
         //! Unknown format
         UNKNOWN
     };
+
+    /** @typedef Texture2D::PixelFormat
+     Possible texture pixel formats
+     */
+    enum class PixelFormat
+    {
+        //! auto detect the type
+        AUTO,
+        //! 32-bit texture: BGRA8888
+        BGRA8888,
+        //! 32-bit texture: RGBA8888
+        RGBA8888,
+        //! 24-bit texture: RGBA888
+        RGB888,
+        //! 16-bit texture without Alpha channel
+        RGB565,
+        //! 8-bit textures used as masks
+        A8,
+        //! 8-bit intensity texture
+        I8,
+        //! 16-bit textures used as masks
+        AI88,
+        //! 16-bit textures: RGBA4444
+        RGBA4444,
+        //! 16-bit textures: RGB5A1
+        RGB5A1,
+        //! 4-bit PVRTC-compressed texture: PVRTC4
+        PVRTC4,
+        //! 4-bit PVRTC-compressed texture: PVRTC4 (has alpha channel)
+        PVRTC4A,
+        //! 2-bit PVRTC-compressed texture: PVRTC2
+        PVRTC2,
+        //! 2-bit PVRTC-compressed texture: PVRTC2 (has alpha channel)
+        PVRTC2A,
+        //! ETC-compressed texture: ETC
+        ETC,
+        //! S3TC-compressed texture: S3TC_Dxt1
+        S3TC_DXT1,
+        //! S3TC-compressed texture: S3TC_Dxt3
+        S3TC_DXT3,
+        //! S3TC-compressed texture: S3TC_Dxt5
+        S3TC_DXT5,
+        //! ATITC-compressed texture: ATC_RGB
+        ATC_RGB,
+        //! ATITC-compressed texture: ATC_EXPLICIT_ALPHA
+        ATC_EXPLICIT_ALPHA,
+        //! ATITC-compressed texture: ATC_INTERPOLATED_ALPHA
+        ATC_INTERPOLATED_ALPHA,
+        //! Default texture format: AUTO
+        DEFAULT = AUTO,
+
+        NONE = -1
+    };
+
+    struct PixelFormatInfo {
+
+        PixelFormatInfo(GLenum anInternalFormat, GLenum aFormat, GLenum aType, int aBpp, bool aCompressed, bool anAlpha)
+        : internalFormat(anInternalFormat)
+        , format(aFormat)
+        , type(aType)
+        , bpp(aBpp)
+        , compressed(aCompressed)
+        , alpha(anAlpha)
+        {}
+
+        GLenum internalFormat;
+        GLenum format;
+        GLenum type;
+        int bpp;
+        bool compressed;
+        bool alpha;
+    };
+
+    typedef std::map<PixelFormat, const PixelFormatInfo> PixelFormatInfoMap;
 
     /**
      * Enables or disables premultiplied alpha for PNG files.
@@ -132,24 +204,26 @@ public:
     bool initWithRawData(const unsigned char * data, ssize_t dataLen, int width, int height, int bitsPerComponent, bool preMulti = false);
 
     // Getters
-    inline unsigned char *   getData()               { return _data; }
-    inline ssize_t           getDataLen()            { return _dataLen; }
-    inline Format            getFileType()           {return _fileType; }
-    inline Texture2D::PixelFormat getRenderFormat()  { return _renderFormat; }
-    inline int               getWidth()              { return _width; }
-    inline int               getHeight()             { return _height; }
-    inline int               getNumberOfMipmaps()    { return _numberOfMipmaps; }
-    inline MipmapInfo*       getMipmaps()            { return _mipmaps; }
-    inline bool              hasPremultipliedAlpha() { return _hasPremultipliedAlpha; }
-    inline std::string getFilePath() const { return _filePath; }
+    inline unsigned char*    getData() const               { return _data; }
+    inline ssize_t           getDataLen() const            { return _dataLen; }
+    inline Format            getFileType() const           { return _fileType; }
+    inline PixelFormat       getRenderFormat() const       { return _renderFormat; }
+    inline int               getWidth() const              { return _width; }
+    inline int               getHeight() const             { return _height; }
+    inline int               getNumberOfMipmaps() const    { return _numberOfMipmaps; }
+    inline const MipmapInfo* getMipmaps() const            { return _mipmaps; }
+    inline bool              hasPremultipliedAlpha() const { return _hasPremultipliedAlpha; }
+    inline std::string       getFilePath() const           { return _filePath; }
 
-    int                      getBitPerPixel();
-    bool                     hasAlpha();
-    bool                     isCompressed();
+    int                      getBitPerPixel() const;
+    bool                     hasAlpha() const;
+    bool                     isCompressed() const;
+
+    const PixelFormatInfo& getPixelFormatInfo() const;
 
     /**
      @brief    Save Image data to the specified file, with specified format.
-     @param    filePath        the file's absolute path, including file suffix.
+     @param    filename        the file's absolute path, including file suffix.
      @param    isToRGB        whether the image is saved as RGB format.
      */
     bool saveToFile(const std::string &filename, bool isToRGB = true);
@@ -163,6 +237,7 @@ protected:
     bool initWithPVRv2Data(const unsigned char * data, ssize_t dataLen);
     bool initWithPVRv3Data(const unsigned char * data, ssize_t dataLen);
     bool initWithETCData(const unsigned char * data, ssize_t dataLen);
+    bool initWithS3TCData(const unsigned char * data, ssize_t dataLen);
 
     typedef struct sImageTGA tImageTGA;
     bool initWithTGAData(tImageTGA* tgaData);
@@ -186,9 +261,8 @@ protected:
     ssize_t _dataLen;
     int _width;
     int _height;
-    bool _unpack;
     Format _fileType;
-    Texture2D::PixelFormat _renderFormat;
+    PixelFormat _renderFormat;
     MipmapInfo _mipmaps[MIPMAP_MAX];   // pointer to mipmap images
     int _numberOfMipmaps;
     // false if we can't auto detect the image is premultiplied or not.
@@ -197,17 +271,18 @@ protected:
 
 protected:
     // noncopyable
-    Image(const Image& rImg);
-    Image& operator=(const Image&);
+    Image(const Image&) = delete;
+    Image& operator=(const Image&) = delete;
 
-    /*
-     @brief The same result as with initWithImageFile, but thread safe. It is caused by
-     loadImage() in TextureCache.cpp.
-     @param fullpath  full path of the file.
-     @param imageType the type of image, currently only supporting two types.
-     @return  true if loaded correctly.
+    // nonmoveable
+    Image(Image&&) = delete;
+    Image& operator=(Image&&) = delete;
+
+    /**
+     * @js NA
+     * @lua NA
      */
-    bool initWithImageFileThreadSafe(const std::string& fullpath);
+    virtual ~Image();
 
     Format detectFormat(const unsigned char * data, ssize_t dataLen);
     bool isPng(const unsigned char * data, ssize_t dataLen);
@@ -216,6 +291,7 @@ protected:
     bool isWebp(const unsigned char * data, ssize_t dataLen);
     bool isPvr(const unsigned char * data, ssize_t dataLen);
     bool isEtc(const unsigned char * data, ssize_t dataLen);
+    bool isS3TC(const unsigned char * data,ssize_t dataLen);
 };
 
 // end of platform group

@@ -1,5 +1,6 @@
 /****************************************************************************
 Copyright (c) 2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -31,7 +32,7 @@ THE SOFTWARE.
 #include <functional>
 #include <mutex>
 
-namespace cocos2d { namespace experimental {
+namespace cocos2d { 
 
 class Track : public PcmBufferProvider, public IVolumeProvider
 {
@@ -61,6 +62,8 @@ public:
 
     void setVolume(float volume);
     float getVolume() const;
+
+    void setAudioFocus(bool isFocus);
 
     bool setPosition(float pos);
     float getPosition() const;
@@ -96,8 +99,9 @@ private:
     std::mutex _volumeDirtyMutex;
     bool _isLoop;
     bool _isInitialized;
+    bool _isAudioFocus;
 
     friend class AudioMixerController;
 };
 
-}} // namespace cocos2d { namespace experimental {
+} // namespace cocos2d { 

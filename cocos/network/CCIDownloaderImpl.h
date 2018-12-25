@@ -1,5 +1,6 @@
 /****************************************************************************
 Copyright (c) 2015-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -27,8 +28,10 @@ THE SOFTWARE.
 #include <string>
 #include <unordered_map>
 #include <memory>
+#include <vector>
+#include <functional>
 
-#include "base/CCConsole.h"
+#include "base/ccMacros.h"
 
 //#define CC_DOWNLOADER_DEBUG
 #ifdef  CC_DOWNLOADER_DEBUG
@@ -65,6 +68,8 @@ namespace cocos2d { namespace network
                            std::vector<unsigned char>& data)> onTaskFinish;
 
         virtual IDownloadTask *createCoTask(std::shared_ptr<const DownloadTask>& task) = 0;
+
+        virtual void abort(const std::unique_ptr<IDownloadTask>& task) = 0;
     };
 
 }}  // namespace cocos2d::network

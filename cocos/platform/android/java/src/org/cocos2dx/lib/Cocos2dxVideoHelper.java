@@ -1,5 +1,6 @@
 /****************************************************************************
 Copyright (c) 2014-2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -32,6 +33,7 @@ import android.util.Log;
 import android.util.SparseArray;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.RelativeLayout;
 
 import org.cocos2dx.lib.Cocos2dxVideoView.OnVideoEventListener;
 
@@ -42,13 +44,13 @@ import java.util.concurrent.FutureTask;
 
 public class Cocos2dxVideoHelper {
 
-    private FrameLayout mLayout = null;
+    private RelativeLayout mLayout = null;
     private Cocos2dxActivity mActivity = null;  
     private static SparseArray<Cocos2dxVideoView> sVideoViews = null;
     static VideoHandler mVideoHandler = null;
     private static Handler sHandler = null;
     
-    Cocos2dxVideoHelper(Cocos2dxActivity activity,FrameLayout layout)
+    Cocos2dxVideoHelper(Cocos2dxActivity activity,RelativeLayout layout)
     {
         mActivity = activity;
         mLayout = layout;
@@ -72,6 +74,8 @@ public class Cocos2dxVideoHelper {
     private final static int VideoTaskRestart = 10;
     private final static int VideoTaskKeepRatio = 11;
     private final static int VideoTaskFullScreen = 12;
+    private final static int VideoTaskSetVolume = 13;
+
     final static int KeyEventBack = 1000;
 
     static class VideoHandler extends Handler{
@@ -107,11 +111,10 @@ public class Cocos2dxVideoHelper {
                 break;
             }
             case VideoTaskFullScreen:{
-                Rect rect = (Rect)msg.obj;
                 if (msg.arg2 == 1) {
-                    helper._setFullScreenEnabled(msg.arg1, true, rect.right, rect.bottom);
+                    helper._setFullScreenEnabled(msg.arg1, true);
                 } else {
-                    helper._setFullScreenEnabled(msg.arg1, false, rect.right, rect.bottom);
+                    helper._setFullScreenEnabled(msg.arg1, false);
                 }
                 break;
             }
@@ -153,6 +156,11 @@ public class Cocos2dxVideoHelper {
             }
             case KeyEventBack: {
                 helper.onBackKeyEvent();
+                break;
+            }
+            case VideoTaskSetVolume: {
+                float volume = (float) msg.arg2 / 10;
+                helper._setVolume(msg.arg1, volume);
                 break;
             }
             default:
@@ -265,7 +273,7 @@ public class Cocos2dxVideoHelper {
         }
     }
 
-    public static void setFullScreenEnabled(int index, boolean enabled, int width, int height) {
+    public static void setFullScreenEnabled(int index, boolean enabled) {
         Message msg = new Message();
         msg.what = VideoTaskFullScreen;
         msg.arg1 = index;
@@ -274,14 +282,13 @@ public class Cocos2dxVideoHelper {
         } else {
             msg.arg2 = 0;
         }
-        msg.obj = new Rect(0, 0, width, height);
         mVideoHandler.sendMessage(msg);
     }
 
-    private void _setFullScreenEnabled(int index, boolean enabled, int width,int height) {
+    private void _setFullScreenEnabled(int index, boolean enabled) {
         Cocos2dxVideoView videoView = sVideoViews.get(index);
         if (videoView != null) {
-            videoView.setFullScreenEnabled(enabled, width, height);
+            videoView.setFullScreenEnabled(enabled);
         }
     }
 
@@ -291,7 +298,7 @@ public class Cocos2dxVideoHelper {
             int key = sVideoViews.keyAt(i);
             Cocos2dxVideoView videoView = sVideoViews.get(key);
             if (videoView != null) {
-                videoView.setFullScreenEnabled(false, 0, 0);
+                videoView.setFullScreenEnabled(false);
                 mActivity.runOnGLThread(new VideoEventRunnable(key, KeyEventBack));
             }
         }
@@ -498,4 +505,20 @@ public class Cocos2dxVideoHelper {
             videoView.setKeepRatio(enable);
         }
     }
+
+    private void _setVolume(final int index, final float volume) {
+        Cocos2dxVideoView videoView = sVideoViews.get(index);
+        if (videoView != null) {
+            videoView.setVolume(volume);
+        }
+    }
+
+    public static void setVolume(final int index, final float volume) {
+        Message msg = new Message();
+        msg.what = VideoTaskSetVolume;
+        msg.arg1 = index;
+        msg.arg2 = (int) (volume * 10);
+        mVideoHandler.sendMessage(msg);
+    }
+
 }

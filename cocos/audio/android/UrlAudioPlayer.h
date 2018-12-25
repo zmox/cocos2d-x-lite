@@ -1,5 +1,6 @@
 /****************************************************************************
 Copyright (c) 2016 Chukong Technologies Inc.
+Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
 
 http://www.cocos2d-x.org
 
@@ -32,7 +33,7 @@ THE SOFTWARE.
 #include <memory>
 #include <thread>
 
-namespace cocos2d { namespace experimental {
+namespace cocos2d { 
 
 class ICallerThreadUtils;
 class AssetFd;
@@ -68,6 +69,8 @@ public:
 
     virtual float getVolume() const override;
 
+    virtual void setAudioFocus(bool isFocus) override;
+
     virtual void setLoop(bool isLoop) override;
 
     virtual bool isLoop() const override;
@@ -97,6 +100,8 @@ private:
 
     void playEventCallback(SLPlayItf caller, SLuint32 playEvent);
 
+    void setVolumeToSLPlayer(float volume);
+
 private:
     SLEngineItf _engineItf;
     SLObjectItf _outputMixObj;
@@ -115,6 +120,7 @@ private:
     float _volume;
     float _duration;
     bool _isLoop;
+    bool _isAudioFocus;
     State _state;
 
     PlayEventCallback _playEventCallback;
@@ -126,4 +132,4 @@ private:
     friend class AudioPlayerProvider;
 };
 
-}} // namespace cocos2d { namespace experimental {
+} // namespace cocos2d { 
